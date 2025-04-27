@@ -9,10 +9,7 @@ import fetch from 'node-fetch';
 import MongoStore from 'connect-mongo';
 
 
-
-
 dotenv.config({ path: 'cert.env' });
-
 const app = express();
 const port = process.env.PORT || 3000;
 
@@ -625,6 +622,11 @@ app.post('/client-ip-get', async (req, res) => {
     console.error('​/client-ip-get error', err);
     return res.status(500).json({ error: 'Server error' });
   }
+});
+
+// health-check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ message: 'ok' });
 });
 
 
