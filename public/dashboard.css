@@ -1,0 +1,187 @@
+@font-face {
+	font-family: 'URW Gothic L';
+	src: url('/fonts/URWGothic-Book.ttf') format('truetype');
+}
+
+@font-face {
+	font-family: 'Manjari Bold';
+	src: url('/fonts/Manjari-Bold.ttf') format('truetype');
+}
+
+@font-face {
+	font-family: 'PakType Naskh Basic';
+	src: url('/fonts/PakTypeNaskhBasic.ttf') format('truetype');
+	/* replace if filename is different */
+}
+
+@font-face {
+	font-family: 'DejaVu Sans Mono';
+	src: url('/fonts/DejaVuSansMono.ttf') format('truetype');
+	/* replace if filename is different */
+}
+
+@font-face {
+	font-family: 'Freesans';
+	src: url('/fonts/FreeSans.ttf') format('truetype');
+	/* replace if filename is different */
+}
+
+body {
+	background: linear-gradient(-90deg, #653160, #3b4078, #526b23, #c04e4e) 0 50% / 400% 400%;
+	margin: 0;
+	padding: 0;
+	animation: gradient 6s ease-in-out infinite alternate-reverse;
+	overflow-x: hidden;
+	overflow-y: scroll;
+}
+
+header {
+	width: 100%;
+	height: 10vh;
+	background: #000;
+}
+
+.bar {
+	color: white;
+	display: flex;
+	align-items: center;
+	gap: 66vw;
+	width: 100%;
+	height: 100%;
+}
+
+.bar div:nth-of-type(1) {
+	margin-left: 2vw;
+}
+
+.bar h2 {
+	font: 2.2vw 'URW Gothic L';
+}
+
+.bar input {
+	background: #bc2b2b;
+	color: white;
+	border-radius: 0.5vw;
+	height: 5vh;
+	font: 1.1vw freesans;
+	border: none;
+}
+
+.bar input:active {
+	background: #3a3947;
+}
+
+main {
+	margin: 10vh auto 10vh auto;
+}
+
+.menus {
+	display: flex;
+	justify-content: center;
+	align-content: center;
+	align-items: center;
+	justify-items: center;
+	flex-direction: column;
+}
+
+.sub1,
+.sub2,
+.sub3,
+.sub4 {
+	background: #329c94d6;
+	width: 20vw;
+	border-radius: 1.5vw;
+	display: flex;
+	height: 35vh;
+	align-items: center;
+	justify-content: center;
+	flex-direction: column;
+}
+
+.lower-wrapper,
+.upper-wrapper {
+	display: flex;
+	gap: 3vw;
+	margin: auto auto 5vh auto;
+}
+
+.menus h1 {
+	font: 2.4vw PakType Naskh Basic;
+	text-align: center;
+	color: #8dff00;
+}
+
+.lower-wrapper div div,
+.upper-wrapper div div {
+	width: 100%;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	height: 3.5vh;
+}
+
+.menus hr {
+	width: 100%;
+}
+
+.menus a {
+	text-decoration: none;
+	color: white;
+	background: #329837;
+	width: 6vw;
+	font: 1.3vw 'Freesans';
+	display: block;
+	text-align: center;
+	border-radius: 0.65vw;
+	line-height: 6.5vh;
+	box-shadow: 0.3vw 0.2vw 2vh #ff0900;
+	height: 6.5vh;
+}
+
+.menus a:hover {
+	background: #6417ad;
+}
+
+.menus a:focus {
+	background: #7d0d28;
+	box-shadow: none;
+}
+
+.bar div:nth-of-type(2) {
+	display: flex;
+	width: 100%;
+	height: 100%;
+	gap: 5vh;
+	align-items: center;
+	justify-items: center;
+}
+
+.bar h4 {
+	font: 1.25vw DejaVu Sans Mono;
+}
+
+@keyframes gradient {
+	0% {
+		background-position: 0% 0%;
+	}
+
+	50% {
+		background-position: 50% 100%;
+	}
+
+	100% {
+		background-position: 100% 100%;
+	}
+}
+
+footer {
+	background: #000;
+	width: 100%;
+	position: absolute;
+}
+
+footer h2 {
+	color: #fff;
+	font: 1.5vw 'Manjari Bold';
+	text-align: center;
+}
