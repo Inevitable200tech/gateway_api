@@ -6,6 +6,11 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import cron from 'node-cron';
 import fetch from 'node-fetch';
+import session from 'express-session';
+import MongoStore from 'connect-mongo';
+
+
+
 
 dotenv.config({ path: 'cert.env' });
 
@@ -23,6 +28,11 @@ app.use(session({
   secret: sessionSecret,
   resave: false,
   saveUninitialized: false,
+  store: MongoStore.create({
+    mongoUrl: process.env.GATEWAY_DB_URI,
+    collectionName: 'sessions',
+    ttl: 14 * 24 * 60 * 60    // sessions expire after 14 days
+  }),
   cookie: { secure: false }
 }));
 
