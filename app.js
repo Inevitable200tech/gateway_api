@@ -6,7 +6,6 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import cron from 'node-cron';
 import fetch from 'node-fetch';
-import session from 'express-session';
 import MongoStore from 'connect-mongo';
 
 
