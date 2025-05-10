@@ -727,36 +727,46 @@ app.get('/health', (req, res) => {
 });
 
 app.post('/upload', zipUpload.single('file'), (req, res) => {
-  if (!req.session.user)
+  if (!req.session.user) {
+    console.log('Unauthorized upload attempt');
     return res.status(401).send('Unauthorized');
+  }
 
+  console.log(`Starting upload for user: ${req.session.user}, file: ${req.file.originalname}`);
   const uploadStream = bucket.openUploadStream(req.file.originalname, {
     metadata: { uploadedBy: req.session.user, uploadDate: new Date() }
   });
 
   uploadStream.end(req.file.buffer, () => {
+    console.log(`Upload successful for user: ${req.session.user}, file: ${req.file.originalname}`);
     res.send('Upload successful');
   });
 
   uploadStream.on('error', err => {
-    console.error('GridFS upload error:', err);
+    console.error(`GridFS upload error for user: ${req.session.user}, file: ${req.file.originalname}`, err);
     res.status(500).send('Upload failed');
   });
 });
 
 app.post('/upload/:category', zipUpload.single('file'), async (req, res) => {
-  if (!req.session.user) return res.status(401).send('Unauthorized');
-  
+  if (!req.session.user) {
+    console.log('Unauthorized upload attempt to category:', req.params.category);
+    return res.status(401).send('Unauthorized');
+  }
+
   const category = req.params.category;
   if (!['subServiceZip', 'mainServiceExe', 'xenoExecutorZip'].includes(category)) {
+    console.log(`Invalid category upload attempt: ${category}`);
     return res.status(400).send('Invalid category');
   }
 
+  console.log(`Starting upload for user: ${req.session.user}, category: ${category}, file: ${req.file.originalname}`);
   const uploadStream = bucket.openUploadStream(req.file.originalname, {
     metadata: { uploadedBy: req.session.user, uploadDate: new Date(), category }
   });
 
   uploadStream.end(req.file.buffer, async () => {
+    console.log(`Upload successful for user: ${req.session.user}, category: ${category}, file: ${req.file.originalname}`);
     await FileMetadata.findOneAndUpdate(
       { category, uploadedBy: req.session.user },
       { filename: req.file.originalname, fileId: uploadStream.id, uploadDate: new Date() },
@@ -766,37 +776,51 @@ app.post('/upload/:category', zipUpload.single('file'), async (req, res) => {
   });
 
   uploadStream.on('error', err => {
-    console.error(`GridFS upload error for ${category}:`, err);
+    console.error(`GridFS upload error for user: ${req.session.user}, category: ${category}, file: ${req.file.originalname}`, err);
     res.status(500).send('Upload failed');
   });
 });
 
 app.post('/remove/:category', async (req, res) => {
-  if (!req.session.user) return res.status(401).send('Unauthorized');
-  
+  if (!req.session.user) {
+    console.log('Unauthorized remove attempt for category:', req.params.category);
+    return res.status(401).send('Unauthorized');
+  }
+
   const category = req.params.category;
   if (!['subServiceZip', 'mainServiceExe', 'xenoExecutorZip'].includes(category)) {
+    console.log(`Invalid category remove attempt: ${category}`);
     return res.status(400).send('Invalid category');
   }
 
+  console.log(`Starting removal for user: ${req.session.user}, category: ${category}`);
   const file = await FileMetadata.findOne({ category, uploadedBy: req.session.user });
   if (file) {
+    console.log(`Removing file: ${file.filename}, category: ${category}, uploaded by: ${req.session.user}`);
     await bucket.delete(file.fileId);
     await FileMetadata.deleteOne({ category, uploadedBy: req.session.user });
+  } else {
+    console.log(`No file found for removal in category: ${category}, uploaded by: ${req.session.user}`);
   }
   res.redirect('/updater');
 });
 
 app.post('/update/:category', zipUpload.single('file'), async (req, res) => {
-  if (!req.session.user) return res.status(401).send('Unauthorized');
-  
+  if (!req.session.user) {
+    console.log('Unauthorized update attempt for category:', req.params.category);
+    return res.status(401).send('Unauthorized');
+  }
+
   const category = req.params.category;
   if (!['subServiceZip', 'mainServiceExe', 'xenoExecutorZip'].includes(category)) {
+    console.log(`Invalid category update attempt: ${category}`);
     return res.status(400).send('Invalid category');
   }
 
+  console.log(`Starting update for user: ${req.session.user}, category: ${category}, file: ${req.file.originalname}`);
   const existingFile = await FileMetadata.findOne({ category, uploadedBy: req.session.user });
   if (existingFile) {
+    console.log(`Deleting existing file: ${existingFile.filename}, category: ${category}, uploaded by: ${req.session.user}`);
     await bucket.delete(existingFile.fileId);
   }
 
@@ -805,6 +829,7 @@ app.post('/update/:category', zipUpload.single('file'), async (req, res) => {
   });
 
   uploadStream.end(req.file.buffer, async () => {
+    console.log(`Update successful for user: ${req.session.user}, category: ${category}, file: ${req.file.originalname}`);
     await FileMetadata.findOneAndUpdate(
       { category, uploadedBy: req.session.user },
       { filename: req.file.originalname, fileId: uploadStream.id, uploadDate: new Date() },
@@ -814,7 +839,7 @@ app.post('/update/:category', zipUpload.single('file'), async (req, res) => {
   });
 
   uploadStream.on('error', err => {
-    console.error(`GridFS update error for ${category}:`, err);
+    console.error(`GridFS update error for user: ${req.session.user}, category: ${category}, file: ${req.file.originalname}`, err);
     res.status(500).send('Update failed');
   });
 });
