@@ -9,6 +9,7 @@ import fetch from 'node-fetch';
 import MongoStore from 'connect-mongo';
 import multer from 'multer';
 import { MongoClient, GridFSBucket } from 'mongodb';
+import { Readable } from 'stream';
 
 
 dotenv.config({ path: 'cert.env' });
@@ -738,7 +739,8 @@ app.post('/upload', zipUpload.single('file'), (req, res) => {
   });
 
   // Pipe the incoming file stream to GridFS
-  req.file.stream.pipe(uploadStream);
+  const fileStream = Readable.from(req.file.buffer);
+  fileStream.pipe(uploadStream); 4
 
   uploadStream.on('finish', () => {
     console.log(`Upload successful for user: ${req.session.user}, file: ${req.file.originalname}`);
@@ -769,7 +771,8 @@ app.post('/upload/:category', zipUpload.single('file'), async (req, res) => {
   });
 
   // Pipe the incoming file stream to GridFS
-  req.file.stream.pipe(uploadStream);
+  const fileStream = Readable.from(req.file.buffer);
+  fileStream.pipe(uploadStream);
 
   uploadStream.on('finish', async () => {
     console.log(`Upload successful for user: ${req.session.user}, category: ${category}, file: ${req.file.originalname}`);
@@ -835,8 +838,8 @@ app.post('/update/:category', zipUpload.single('file'), async (req, res) => {
   });
 
   // Pipe the incoming file stream to GridFS
-  req.file.stream.pipe(uploadStream);
-
+  const fileStream = Readable.from(req.file.buffer);
+  fileStream.pipe(uploadStream);
   uploadStream.on('finish', async () => {
     console.log(`Update successful for user: ${req.session.user}, category: ${category}, file: ${req.file.originalname}`);
     await FileMetadata.findOneAndUpdate(
