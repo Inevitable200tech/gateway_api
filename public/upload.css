@@ -1,0 +1,76 @@
+.upload-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: calc(100vh - 200px);
+  padding: 20px;
+}
+
+.upload-card {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  padding: 20px;
+  width: 100%;
+  max-width: 600px;
+}
+
+.upload-card h1 {
+  text-align: center;
+  margin-bottom: 20px;
+  color: #333;
+}
+
+.file-section {
+  margin-bottom: 20px;
+  padding: 15px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.file-section h3 {
+  margin: 0 0 10px;
+  color: #555;
+}
+
+.file-section p {
+  margin: 5px 0;
+  color: #666;
+}
+
+.file-section input[type="file"] {
+  margin: 10px 0;
+  width: 100%;
+}
+
+.upload-btn, .update-btn, .remove-btn, .cancel-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-right: 10px;
+}
+
+.upload-btn, .update-btn {
+  background: #4caf50;
+  color: white;
+}
+
+.remove-btn {
+  background: #f44336;
+  color: white;
+}
+
+.cancel-btn {
+  background: #666;
+  color: white;
+}
+
+.upload-actions {
+  text-align: center;
+  margin-top: 20px;
+}
+
+button:hover {
+  opacity: 0.9;
+}

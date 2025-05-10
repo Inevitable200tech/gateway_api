@@ -7,6 +7,8 @@ import dotenv from 'dotenv';
 import cron from 'node-cron';
 import fetch from 'node-fetch';
 import MongoStore from 'connect-mongo';
+import multer from 'multer';
+import { MongoClient, GridFSBucket } from 'mongodb';
 
 
 dotenv.config({ path: 'cert.env' });
@@ -38,7 +40,7 @@ app.use(session({
     maxAge: 14 * 24 * 60 * 60 * 1000 // 14 days in ms
   }
 }));
-  
+
 // MongoDB connection
 const dbURI = process.env.GATEWAY_DB_URI;
 mongoose.connect(dbURI)
@@ -85,6 +87,32 @@ const statusPriority = {
   'not reachable': 5
 };
 
+const FileMetadataSchema = new mongoose.Schema({
+  category: { type: String, enum: ['subServiceZip', 'mainServiceExe', 'xenoExecutorZip'], unique: true },
+  filename: String,
+  fileId: mongoose.Types.ObjectId,
+  uploadedBy: String,
+  uploadDate: { type: Date, default: Date.now }
+});
+
+const FileMetadata = mongoose.model('FileMetadata', FileMetadataSchema);
+
+// … after mongoose.connect(…) …
+const client = new MongoClient(process.env.GATEWAY_DB_URI);
+await client.connect();
+const db = client.db();
+const bucket = new GridFSBucket(db, { bucketName: 'zips' });
+
+const zipUpload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (req, file, cb) => {
+    const allowed = /\.(zip|exe)$/i.test(file.originalname);
+    cb(allowed ? null : new Error('Only .zip or .exe allowed'), allowed);
+  }
+});
+
+
+// Polling function for API health
 async function pollApi(api) {
   let record;
   try {
@@ -101,9 +129,9 @@ async function pollApi(api) {
     if (usagePercent !== 'N/A') {
       const u = +usagePercent;
       status = u < 50 ? 'idle'
-             : u < 70 ? 'slightly busy'
-             : u < 90 ? 'busy'
-             :           'very busy';
+        : u < 70 ? 'slightly busy'
+          : u < 90 ? 'busy'
+            : 'very busy';
     }
 
     record = {
@@ -130,7 +158,7 @@ async function pollApi(api) {
 // update the ServerOrder for a given type
 async function updateOrderForType(type) {
   // get latest status per URL of this type
-  const endpoints = (await ApiEndpoint.find({ type })).map(a=>a.url);
+  const endpoints = (await ApiEndpoint.find({ type })).map(a => a.url);
   const statuses = await ApiStatus
     .find({ url: { $in: endpoints } })
     .sort({ lastChecked: -1 })
@@ -142,7 +170,7 @@ async function updateOrderForType(type) {
   });
 
   const newOrder = Object.values(latest)
-    .sort((a,b) => statusPriority[a.status] - statusPriority[b.status])
+    .sort((a, b) => statusPriority[a.status] - statusPriority[b.status])
     .map(r => r.url);
 
   await ServerOrder.findOneAndUpdate(
@@ -156,7 +184,7 @@ async function updateOrderForType(type) {
 // schedule one cron per API based on its `ping` field
 async function scheduleAllApis() {
   // stop any existing tasks
-  cron.getTasks().forEach(t=>t.stop());
+  cron.getTasks().forEach(t => t.stop());
 
   const apis = await ApiEndpoint.find({});
   for (const api of apis) {
@@ -176,6 +204,60 @@ scheduleAllApis();
 // re-schedule when endpoints collection changes
 ApiEndpoint.watch().on('change', scheduleAllApis);
 
+const getUploadHTML = async (username) => {
+  // Fetch existing files from FileMetadata
+  const files = await FileMetadata.find({ uploadedBy: username }).lean();
+  const fileMap = {};
+  files.forEach(file => {
+    fileMap[file.category] = file;
+  });
+
+  const getFileSection = (category, label, accept) => {
+    const file = fileMap[category];
+    if (file) {
+      return `
+        <div class="file-section">
+          <h3>${label}</h3>
+          <p>Current File: ${file.filename}</p>
+          <p>Uploaded: ${new Date(file.uploadDate).toLocaleString()}</p>
+          <form action="/remove/${category}" method="POST" onsubmit="return confirm('Are you sure you want to remove this file?')">
+            <button type="submit" class="remove-btn">Remove</button>
+          </form>
+          <form action="/update/${category}" method="POST" enctype="multipart/form-data">
+            <input type="file" name="file" accept="${accept}" required>
+            <button type="submit" class="update-btn">Update</button>
+          </form>
+        </div>
+      `;
+    } else {
+      return `
+        <div class="file-section">
+          <h3>${label}</h3>
+          <p>No file uploaded</p>
+          <form action="/upload/${category}" method="POST" enctype="multipart/form-data">
+            <input type="file" name="file" accept="${accept}" required>
+            <button type="submit" class="upload-btn">Upload</button>
+          </form>
+        </div>
+      `;
+    }
+  };
+
+  return wrapPageContent(username, `
+    <link href="/upload.css" rel="stylesheet">
+    <div class="upload-wrapper">
+      <div class="upload-card">
+        <h1>Manage Files</h1>
+        ${getFileSection('subServiceZip', 'Sub-service Zip Files', '.zip')}
+        ${getFileSection('mainServiceExe', 'Main Service .exe', '.exe')}
+        ${getFileSection('xenoExecutorZip', 'Xeno Executor Update .zip', '.zip')}
+        <div class="upload-actions">
+          <button type="button" onclick="location.href='/dashboard'" class="cancel-btn">Back to Dashboard</button>
+        </div>
+      </div>
+    </div>
+  `);
+};
 
 // Login Page
 const loginHTML = `<!DOCTYPE html>
@@ -256,8 +338,8 @@ const getDashboardHTML = (username) => wrapPageContent(username, `
         <div><hr><a href="/status">Proceed</a></div> <!-- Fixed to /status -->
       </div>
       <div class="sub4">
-        <h1>Live Image Gallery</h1>
-        <div><hr><a href="#">Coming Soon</a></div>
+        <h1>Update Files</h1>
+        <div><hr><a href="/updater">Proceed</a></div>
       </div>
     </div>
   </div>
@@ -376,6 +458,14 @@ app.get('/', (req, res) => {
   if (req.session.user) return res.redirect('/dashboard');
   res.send(loginHTML);
 });
+app.get('/updater', async (req, res) => {
+  if (!req.session.user) {
+    console.log('Unauthorized access to /updater');
+    return res.redirect('/');
+  }
+  res.send(await getUploadHTML(req.session.user));
+});
+
 
 app.post('/login', async (req, res) => {
   const { username, password } = req.body;
@@ -584,7 +674,7 @@ app.post('/order', async (req, res) => {
 
   // decide which ordering to use
   let type;
-  if (server.includes('.public'))  type = 'Public';
+  if (server.includes('.public')) type = 'Public';
   else if (server.includes('.private')) type = 'Private';
   else return res.status(400).json({ error: 'Server must contain .public or .private' });
 
@@ -610,7 +700,7 @@ app.post('/client-ip-get', async (req, res) => {
 
   // decide which ordering to use
   let type;
-  if (server.includes('.public'))       type = 'Public';
+  if (server.includes('.public')) type = 'Public';
   else if (server.includes('.private')) type = 'Private';
   else return res.status(400).json({ error: 'client ip must contain .public or .private' });
 
@@ -634,6 +724,99 @@ app.post('/client-ip-get', async (req, res) => {
 // health-check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({ message: 'ok' });
+});
+
+app.post('/upload', zipUpload.single('file'), (req, res) => {
+  if (!req.session.user)
+    return res.status(401).send('Unauthorized');
+
+  const uploadStream = bucket.openUploadStream(req.file.originalname, {
+    metadata: { uploadedBy: req.session.user, uploadDate: new Date() }
+  });
+
+  uploadStream.end(req.file.buffer, () => {
+    res.send('Upload successful');
+  });
+
+  uploadStream.on('error', err => {
+    console.error('GridFS upload error:', err);
+    res.status(500).send('Upload failed');
+  });
+});
+
+app.post('/upload/:category', zipUpload.single('file'), async (req, res) => {
+  if (!req.session.user) return res.status(401).send('Unauthorized');
+  
+  const category = req.params.category;
+  if (!['subServiceZip', 'mainServiceExe', 'xenoExecutorZip'].includes(category)) {
+    return res.status(400).send('Invalid category');
+  }
+
+  const uploadStream = bucket.openUploadStream(req.file.originalname, {
+    metadata: { uploadedBy: req.session.user, uploadDate: new Date(), category }
+  });
+
+  uploadStream.end(req.file.buffer, async () => {
+    await FileMetadata.findOneAndUpdate(
+      { category, uploadedBy: req.session.user },
+      { filename: req.file.originalname, fileId: uploadStream.id, uploadDate: new Date() },
+      { upsert: true }
+    );
+    res.redirect('/updater');
+  });
+
+  uploadStream.on('error', err => {
+    console.error(`GridFS upload error for ${category}:`, err);
+    res.status(500).send('Upload failed');
+  });
+});
+
+app.post('/remove/:category', async (req, res) => {
+  if (!req.session.user) return res.status(401).send('Unauthorized');
+  
+  const category = req.params.category;
+  if (!['subServiceZip', 'mainServiceExe', 'xenoExecutorZip'].includes(category)) {
+    return res.status(400).send('Invalid category');
+  }
+
+  const file = await FileMetadata.findOne({ category, uploadedBy: req.session.user });
+  if (file) {
+    await bucket.delete(file.fileId);
+    await FileMetadata.deleteOne({ category, uploadedBy: req.session.user });
+  }
+  res.redirect('/updater');
+});
+
+app.post('/update/:category', zipUpload.single('file'), async (req, res) => {
+  if (!req.session.user) return res.status(401).send('Unauthorized');
+  
+  const category = req.params.category;
+  if (!['subServiceZip', 'mainServiceExe', 'xenoExecutorZip'].includes(category)) {
+    return res.status(400).send('Invalid category');
+  }
+
+  const existingFile = await FileMetadata.findOne({ category, uploadedBy: req.session.user });
+  if (existingFile) {
+    await bucket.delete(existingFile.fileId);
+  }
+
+  const uploadStream = bucket.openUploadStream(req.file.originalname, {
+    metadata: { uploadedBy: req.session.user, uploadDate: new Date(), category }
+  });
+
+  uploadStream.end(req.file.buffer, async () => {
+    await FileMetadata.findOneAndUpdate(
+      { category, uploadedBy: req.session.user },
+      { filename: req.file.originalname, fileId: uploadStream.id, uploadDate: new Date() },
+      { upsert: true }
+    );
+    res.redirect('/updater');
+  });
+
+  uploadStream.on('error', err => {
+    console.error(`GridFS update error for ${category}:`, err);
+    res.status(500).send('Update failed');
+  });
 });
 
 // Server Start
