@@ -737,7 +737,10 @@ app.post('/upload', zipUpload.single('file'), (req, res) => {
     metadata: { uploadedBy: req.session.user, uploadDate: new Date() }
   });
 
-  uploadStream.end(req.file.buffer, () => {
+  // Pipe the incoming file stream to GridFS
+  req.file.stream.pipe(uploadStream);
+
+  uploadStream.on('finish', () => {
     console.log(`Upload successful for user: ${req.session.user}, file: ${req.file.originalname}`);
     res.send('Upload successful');
   });
@@ -765,7 +768,10 @@ app.post('/upload/:category', zipUpload.single('file'), async (req, res) => {
     metadata: { uploadedBy: req.session.user, uploadDate: new Date(), category }
   });
 
-  uploadStream.end(req.file.buffer, async () => {
+  // Pipe the incoming file stream to GridFS
+  req.file.stream.pipe(uploadStream);
+
+  uploadStream.on('finish', async () => {
     console.log(`Upload successful for user: ${req.session.user}, category: ${category}, file: ${req.file.originalname}`);
     await FileMetadata.findOneAndUpdate(
       { category, uploadedBy: req.session.user },
@@ -828,7 +834,10 @@ app.post('/update/:category', zipUpload.single('file'), async (req, res) => {
     metadata: { uploadedBy: req.session.user, uploadDate: new Date(), category }
   });
 
-  uploadStream.end(req.file.buffer, async () => {
+  // Pipe the incoming file stream to GridFS
+  req.file.stream.pipe(uploadStream);
+
+  uploadStream.on('finish', async () => {
     console.log(`Update successful for user: ${req.session.user}, category: ${category}, file: ${req.file.originalname}`);
     await FileMetadata.findOneAndUpdate(
       { category, uploadedBy: req.session.user },
