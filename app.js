@@ -10,6 +10,7 @@ import MongoStore from 'connect-mongo';
 
 
 dotenv.config({ path: 'cert.env' });
+
 const app = express();
 const port = process.env.PORT || 3000;
 
@@ -20,6 +21,7 @@ const sessionSecret = crypto.randomBytes(64).toString('hex');
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
+app.set('trust proxy', 1);
 app.use(session({
   secret: sessionSecret,
   resave: false,
@@ -27,11 +29,16 @@ app.use(session({
   store: MongoStore.create({
     mongoUrl: process.env.GATEWAY_DB_URI,
     collectionName: 'sessions',
-    ttl: 14 * 24 * 60 * 60    // sessions expire after 14 days
+    ttl: 14 * 24 * 60 * 60
   }),
-  cookie: { secure: false }
+  cookie: {
+    secure: true,
+    httpOnly: true,
+    sameSite: 'strict',
+    maxAge: 14 * 24 * 60 * 60 * 1000 // 14 days in ms
+  }
 }));
-
+  
 // MongoDB connection
 const dbURI = process.env.GATEWAY_DB_URI;
 mongoose.connect(dbURI)
@@ -628,7 +635,6 @@ app.post('/client-ip-get', async (req, res) => {
 app.get('/health', (req, res) => {
   res.status(200).json({ message: 'ok' });
 });
-
 
 // Server Start
 app.listen(port, () => {
