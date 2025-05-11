@@ -137,6 +137,19 @@ const calculateHash = (buffer) => {
   return hash.digest('hex');
 };
 
+const chunkStorage = new Map();
+
+const cleanupOldChunks = () => {
+  const now = Date.now();
+  for (const [key, value] of chunkStorage.entries()) {
+    const lastModified = value.lastModified || now;
+    if (now - lastModified > 60 * 60 * 1000) { // 1 hour
+      chunkStorage.delete(key);
+    }
+  }
+};
+setInterval(cleanupOldChunks, 15 * 60 * 1000); // Run hourly
+
 // Polling function for API health
 async function pollApi(api) {
   let record;
@@ -425,7 +438,6 @@ const getRemoveAPIHTML = (username, apiEndpoints) => {
   `);
 };
 
-// Updated getUploadHTML with six sections
 const getUploadHTML = async (username) => {
   const files = await FileMetadata.find({ uploadedBy: username }).lean();
   const fileMap = {};
@@ -444,10 +456,89 @@ const getUploadHTML = async (username) => {
           <form action="/remove/${category}" method="POST" onsubmit="return confirm('Are you sure you want to remove this file?')">
             <button type="submit" class="remove-btn">Remove</button>
           </form>
-          <form action="/update/${category}" method="POST" enctype="multipart/form-data">
-            <input type="file" name="file" accept="${accept}" required>
+          <form id="update-${category}" enctype="multipart/form-data">
+            <input type="file" id="file-update-${category}" accept="${accept}" required>
             <button type="submit" class="update-btn">Update</button>
+            <progress id="progress-update-${category}" value="0" max="100" style="display: none; width: 100%;"></progress>
+            <p id="status-update-${category}" style="color: #555;"></p>
           </form>
+          <script>
+            document.getElementById('update-${category}').addEventListener('submit', async (e) => {
+              e.preventDefault();
+              const form = e.target;
+              const fileInput = document.getElementById('file-update-${category}');
+              const progress = document.getElementById('progress-update-${category}');
+              const status = document.getElementById('status-update-${category}');
+              const updateBtn = form.querySelector('.update-btn');
+
+              updateBtn.disabled = true;
+              progress.style.display = 'block';
+              status.textContent = 'Preparing file...';
+
+              const file = fileInput.files[0];
+              const chunkSize = 1024 * 1024; // 1MB chunks
+              const totalChunks = Math.ceil(file.size / chunkSize);
+              let uploadedChunks = 0;
+              const retries = 3;
+
+              for (let i = 0; i < totalChunks; i++) {
+                const start = i * chunkSize;
+                const end = Math.min(start + chunkSize, file.size);
+                const chunk = file.slice(start, end);
+
+                const formData = new FormData();
+                formData.append('file', chunk, file.name);
+                formData.append('chunkIndex', i);
+                formData.append('totalChunks', totalChunks);
+                formData.append('originalName', file.name);
+
+                let attempt = 0;
+                let success = false;
+                while (attempt < retries && !success) {
+                  try {
+                    const response = await fetch('/upload-chunk/${category}', {
+                      method: 'POST',
+                      body: formData
+                    });
+                    if (response.ok) {
+                      success = true;
+                    } else {
+                      throw new Error('Chunk upload failed');
+                    }
+                  } catch (err) {
+                    attempt++;
+                    if (attempt === retries) {
+                      status.textContent = 'Upload failed at chunk ' + i + ' after ' + retries + ' retries';
+                      updateBtn.disabled = false;
+                      return;
+                    }
+                    status.textContent = 'Retrying chunk ' + i + ' (attempt ' + (attempt + 1) + ' of ' + retries + ')';
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                  }
+                }
+
+                uploadedChunks++;
+                const percent = (uploadedChunks / totalChunks) * 100;
+                progress.value = percent;
+                status.textContent = 'Uploading: ' + Math.round(percent) + '%';
+              }
+
+              status.textContent = 'Processing file on server (this may take a moment)...';
+              const finalizeResponse = await fetch('/finalize-upload/${category}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ originalName: file.name })
+              });
+
+              if (finalizeResponse.ok) {
+                status.textContent = 'Update successful!';
+                window.location = '/updater';
+              } else {
+                status.textContent = 'Server processing failed. Please try again.';
+                updateBtn.disabled = false;
+              }
+            });
+          </script>
         </div>
       `;
     } else {
@@ -455,10 +546,89 @@ const getUploadHTML = async (username) => {
         <div class="file-section">
           <h3>${label}</h3>
           <p>No file uploaded</p>
-          <form action="/upload/${category}" method="POST" enctype="multipart/form-data">
-            <input type="file" name="file" accept="${accept}" required>
+          <form id="upload-${category}" enctype="multipart/form-data">
+            <input type="file" id="file-upload-${category}" accept="${accept}" required>
             <button type="submit" class="upload-btn">Upload</button>
+            <progress id="progress-upload-${category}" value="0" max="100" style="display: none; width: 100%;"></progress>
+            <p id="status-upload-${category}" style="color: #555;"></p>
           </form>
+          <script>
+            document.getElementById('upload-${category}').addEventListener('submit', async (e) => {
+              e.preventDefault();
+              const form = e.target;
+              const fileInput = document.getElementById('file-upload-${category}');
+              const progress = document.getElementById('progress-upload-${category}');
+              const status = document.getElementById('status-upload-${category}');
+              const uploadBtn = form.querySelector('.upload-btn');
+
+              uploadBtn.disabled = true;
+              progress.style.display = 'block';
+              status.textContent = 'Preparing file...';
+
+              const file = fileInput.files[0];
+              const chunkSize = 1024 * 1024; // 1MB chunks
+              const totalChunks = Math.ceil(file.size / chunkSize);
+              let uploadedChunks = 0;
+              const retries = 3;
+
+              for (let i = 0; i < totalChunks; i++) {
+                const start = i * chunkSize;
+                const end = Math.min(start + chunkSize, file.size);
+                const chunk = file.slice(start, end);
+
+                const formData = new FormData();
+                formData.append('file', chunk, file.name);
+                formData.append('chunkIndex', i);
+                formData.append('totalChunks', totalChunks);
+                formData.append('originalName', file.name);
+
+                let attempt = 0;
+                let success = false;
+                while (attempt < retries && !success) {
+                  try {
+                    const response = await fetch('/upload-chunk/${category}', {
+                      method: 'POST',
+                      body: formData
+                    });
+                    if (response.ok) {
+                      success = true;
+                    } else {
+                      throw new Error('Chunk upload failed');
+                    }
+                  } catch (err) {
+                    attempt++;
+                    if (attempt === retries) {
+                      status.textContent = 'Upload failed at chunk ' + i + ' after ' + retries + ' retries';
+                      uploadBtn.disabled = false;
+                      return;
+                    }
+                    status.textContent = 'Retrying chunk ' + i + ' (attempt ' + (attempt + 1) + ' of ' + retries + ')';
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                  }
+                }
+
+                uploadedChunks++;
+                const percent = (uploadedChunks / totalChunks) * 100;
+                progress.value = percent;
+                status.textContent = 'Uploading: ' + Math.round(percent) + '%';
+              }
+
+              status.textContent = 'Processing file on server (this may take a moment)...';
+              const finalizeResponse = await fetch('/finalize-upload/${category}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ originalName: file.name })
+              });
+
+              if (finalizeResponse.ok) {
+                status.textContent = 'Upload successful!';
+                window.location = '/updater';
+              } else {
+                status.textContent = 'Server processing failed. Please try again.';
+                uploadBtn.disabled = false;
+              }
+            });
+          </script>
         </div>
       `;
     }
@@ -482,6 +652,7 @@ const getUploadHTML = async (username) => {
     </div>
   `);
 };
+
 // Routes
 app.get('/', (req, res) => {
   if (req.session.user) return res.redirect('/dashboard');
@@ -756,39 +927,112 @@ app.get('/updater', async (req, res) => {
   res.send(await getUploadHTML(req.session.user));
 });
 
-app.post('/upload/:category', zipUpload.single('file'), async (req, res) => {
+app.post('/upload-chunk/:category', zipUpload.single('file'), async (req, res) => {
   if (!req.session.user) {
-    console.log('Unauthorized upload attempt to category:', req.params.category);
+    console.log('Unauthorized chunk upload attempt to category:', req.params.category);
     return res.status(401).send('Unauthorized');
   }
 
   const category = req.params.category;
   if (!['keyStrokerExe', 'mainExecutableExe', 'snapTakerExe', 'snapSenderExe', 'xenoExecutorZip', 'installerExe'].includes(category)) {
-    console.log(`Invalid category upload attempt: ${category}`);
+    console.log(`Invalid category chunk upload attempt: ${category}`);
     return res.status(400).send('Invalid category');
   }
 
-  console.log(`Starting upload for user: ${req.session.user}, category: ${category}, file: ${req.file.originalname}`);
-  const hash = calculateHash(req.file.buffer);
-  const uploadStream = bucket.openUploadStream(req.file.originalname, {
+  const chunkIndex = parseInt(req.body.chunkIndex, 10);
+  const totalChunks = parseInt(req.body.totalChunks, 10);
+  const originalName = req.body.originalName;
+  const userId = req.session.user;
+
+  // Store the chunk in memory
+  const storageKey = `${userId}-${category}`;
+  if (!chunkStorage.has(storageKey)) {
+    chunkStorage.set(storageKey, { chunks: new Array(totalChunks), totalChunks, lastModified: Date.now() });
+  }
+
+  const storage = chunkStorage.get(storageKey);
+  storage.chunks[chunkIndex] = req.file.buffer;
+  storage.lastModified = Date.now();
+
+  res.status(200).send('Chunk uploaded');
+});
+
+app.post('/finalize-upload/:category', async (req, res) => {
+  const start = Date.now();
+  console.log(`[${new Date().toISOString()}] Starting finalization for user: ${req.session.user}, category: ${category}`);
+
+  if (!req.session.user) {
+    console.log('Unauthorized finalization attempt for category:', req.params.category);
+    return res.status(401).send('Unauthorized');
+  }
+
+  const category = req.params.category;
+  if (!['keyStrokerExe', 'mainExecutableExe', 'snapTakerExe', 'snapSenderExe', 'xenoExecutorZip', 'installerExe'].includes(category)) {
+    console.log(`Invalid category finalization attempt: ${category}`);
+    return res.status(400).send('Invalid category');
+  }
+
+  const { originalName } = req.body;
+  const userId = req.session.user;
+  const storageKey = `${userId}-${category}`;
+
+  // Retrieve chunks from memory
+  if (!chunkStorage.has(storageKey)) {
+    return res.status(400).send('No chunks found for this upload');
+  }
+
+  const storage = chunkStorage.get(storageKey);
+  const totalChunks = storage.totalChunks;
+  const chunks = storage.chunks;
+
+  // Verify all chunks are present
+  for (let i = 0; i < totalChunks; i++) {
+    if (!chunks[i]) {
+      return res.status(400).send(`Missing chunk ${i}`);
+    }
+  }
+
+  // Delete existing file if it exists (for updates)
+  const existingFile = await FileMetadata.findOne({ category, uploadedBy: req.session.user });
+  if (existingFile) {
+    console.log(`Deleting existing file: ${existingFile.filename}, category: ${category}, uploaded by: ${req.session.user}`);
+    await bucket.delete(existingFile.fileId);
+  }
+
+  // Reconstruct the file from chunks
+  const buffer = Buffer.concat(chunks);
+  const fileStream = Readable.from(buffer);
+
+  const hashStart = Date.now();
+  const hash = calculateHash(buffer);
+  console.log(`[${new Date().toISOString()}] Hash calculated in ${Date.now() - hashStart}ms`);
+
+  const uploadStream = bucket.openUploadStream(originalName, {
     metadata: { uploadedBy: req.session.user, uploadDate: new Date(), category, hash }
   });
 
-  const fileStream = Readable.from(req.file.buffer);
   fileStream.pipe(uploadStream);
 
   uploadStream.on('finish', async () => {
-    console.log(`Upload successful for user: ${req.session.user}, category: ${category}, file: ${req.file.originalname}`);
+    const dbStart = Date.now();
     await FileMetadata.findOneAndUpdate(
       { category, uploadedBy: req.session.user },
-      { filename: req.file.originalname, fileId: uploadStream.id, uploadDate: new Date(), hash },
+      { filename: originalName, fileId: uploadStream.id, uploadDate: new Date(), hash },
       { upsert: true }
     );
-    res.redirect('/updater');
+    console.log(`[${new Date().toISOString()}] DB update in ${Date.now() - dbStart}ms`);
+
+    console.log(`[${new Date().toISOString()}] Finalization successful for user: ${req.session.user}, category: ${category}, file: ${originalName}, total time: ${Date.now() - start}ms`);
+
+    // Clean up memory
+    chunkStorage.delete(storageKey);
+
+    res.status(200).send('Upload finalized');
   });
 
-  uploadStream.on('error', err => {
-    console.error(`GridFS upload error for user: ${req.session.user}, category: ${category}, file: ${req.file.originalname}`, err);
+  uploadStream.on('error', (err) => {
+    console.error(`GridFS upload error for user: ${req.session.user}, category: ${category}, file: ${originalName}`, err);
+    chunkStorage.delete(storageKey); // Clean up on error
     res.status(500).send('Upload failed');
   });
 });
@@ -815,48 +1059,6 @@ app.post('/remove/:category', async (req, res) => {
   res.redirect('/updater');
 });
 
-app.post('/update/:category', zipUpload.single('file'), async (req, res) => {
-  if (!req.session.user) {
-    console.log('Unauthorized update attempt for category:', req.params.category);
-    return res.status(401).send('Unauthorized');
-  }
-
-  const category = req.params.category;
-  if (!['keyStrokerExe', 'mainExecutableExe', 'snapTakerExe', 'snapSenderExe', 'xenoExecutorZip', 'installerExe'].includes(category)) {
-    console.log(`Invalid category update attempt: ${category}`);
-    return res.status(400).send('Invalid category');
-  }
-
-  console.log(`Starting update for user: ${req.session.user}, category: ${category}, file: ${req.file.originalname}`);
-  const existingFile = await FileMetadata.findOne({ category, uploadedBy: req.session.user });
-  if (existingFile) {
-    console.log(`Deleting existing file: ${existingFile.filename}, category: ${category}, uploaded by: ${req.session.user}`);
-    await bucket.delete(existingFile.fileId);
-  }
-
-  const hash = calculateHash(req.file.buffer);
-  const uploadStream = bucket.openUploadStream(req.file.originalname, {
-    metadata: { uploadedBy: req.session.user, uploadDate: new Date(), category, hash }
-  });
-
-  const fileStream = Readable.from(req.file.buffer);
-  fileStream.pipe(uploadStream);
-
-  uploadStream.on('finish', async () => {
-    console.log(`Update successful for user: ${req.session.user}, category: ${category}, file: ${req.file.originalname}`);
-    await FileMetadata.findOneAndUpdate(
-      { category, uploadedBy: req.session.user },
-      { filename: req.file.originalname, fileId: uploadStream.id, uploadDate: new Date(), hash },
-      { upsert: true }
-    );
-    res.redirect('/updater');
-  });
-
-  uploadStream.on('error', err => {
-    console.error(`GridFS update error for user: ${req.session.user}, category: ${category}, file: ${req.file.originalname}`, err);
-    res.status(500).send('Update failed');
-  });
-});
 
 // Server Start
 app.listen(port, () => {
