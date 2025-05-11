@@ -190,7 +190,7 @@ async function pollApi(api) {
       databaseStatus: 'N/A'
     };
   }
-
+// update the status in the database
   await ApiStatus.findOneAndUpdate(
     { url: api.url },
     { $set: { ...record, lastChecked: new Date() } },
