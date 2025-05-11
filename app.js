@@ -959,7 +959,6 @@ app.post('/upload-chunk/:category', zipUpload.single('file'), async (req, res) =
 
 app.post('/finalize-upload/:category', async (req, res) => {
   const start = Date.now();
-  console.log(`[${new Date().toISOString()}] Starting finalization for user: ${req.session.user}, category: ${category}`);
 
   if (!req.session.user) {
     console.log('Unauthorized finalization attempt for category:', req.params.category);
@@ -967,6 +966,8 @@ app.post('/finalize-upload/:category', async (req, res) => {
   }
 
   const category = req.params.category;
+  console.log(`[${new Date().toISOString()}] Starting finalization for user: ${req.session.user}, category: ${category}`);
+
   if (!['keyStrokerExe', 'mainExecutableExe', 'snapTakerExe', 'snapSenderExe', 'xenoExecutorZip', 'installerExe'].includes(category)) {
     console.log(`Invalid category finalization attempt: ${category}`);
     return res.status(400).send('Invalid category');
