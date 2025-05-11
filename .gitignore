@@ -22,3 +22,4 @@ dump/
 .vscode/
 .idea/
 *.swp
+cert.env

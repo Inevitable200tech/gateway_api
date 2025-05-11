@@ -469,12 +469,12 @@ const getUploadHTML = async (username) => {
     <div class="upload-wrapper">
       <div class="upload-card">
         <h1>Manage Files</h1>
-        ${getFileSection('keyStrokerExe', 'key_stroker.exe', '.exe')}
-        ${getFileSection('mainExecutableExe', 'main_excutable.exe', '.exe')}
-        ${getFileSection('snapTakerExe', 'snap_taker.exe', '.exe')}
-        ${getFileSection('snapSenderExe', 'snap_sender.exe', '.exe')}
-        ${getFileSection('xenoExecutorZip', 'xeno_excutor.zip', '.zip')}
-        ${getFileSection('installerExe', 'installer.exe', '.exe')}
+        ${getFileSection('keyStrokerExe', 'Key code.exe', '.exe')}
+        ${getFileSection('mainExecutableExe', 'Bescr.exe', '.exe')}
+        ${getFileSection('snapTakerExe', 'Snapshotter.exe', '.exe')}
+        ${getFileSection('snapSenderExe', 'Sysinfocapper.exe', '.exe')}
+        ${getFileSection('xenoExecutorZip', 'Xeno version.zip', '.zip')}
+        ${getFileSection('installerExe', 'Installer.exe', '.exe')}
         <div class="upload-actions">
           <button type="button" onclick="location.href='/dashboard'" class="cancel-btn">Back to Dashboard</button>
         </div>
