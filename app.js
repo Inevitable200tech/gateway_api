@@ -1198,6 +1198,8 @@ app.get('/download/:category/:uploadedBy', async (req, res) => {
     const downloadStream = bucket.openDownloadStream(fileMetadata.fileId);
     res.setHeader('Content-Type', 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename="${fileMetadata.filename}"`);
+    // Add the file hash to the response headers
+    res.setHeader('X-File-Hash', fileMetadata.hash);
 
     downloadStream.on('error', (err) => {
       console.error(`Error streaming file ${fileMetadata.fileId}:`, err);
@@ -1212,7 +1214,6 @@ app.get('/download/:category/:uploadedBy', async (req, res) => {
     res.status(500).send('Server error');
   }
 });
-
 // Server Start
 app.listen(port, () => {
   console.log(`🚀 Gateway running at http://localhost:${port}`);
