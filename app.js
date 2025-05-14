@@ -1192,14 +1192,12 @@ app.get('/download/:category', async (req, res) => {
       return res.status(404).send('File not found');
     }
 
-    // Validate file extension matches category
     const expectedExtension = category === 'xenoExecutorZip' ? '.zip' : '.exe';
     if (!fileMetadata.filename.toLowerCase().endsWith(expectedExtension)) {
       console.log(`File ${fileMetadata.filename} does not match expected extension ${expectedExtension} for category: ${category}`);
       return res.status(400).send(`File does not match category extension: expected ${expectedExtension}`);
     }
 
-    // Get the file size from GridFS
     const fileInfo = await bucket.find({ _id: fileMetadata.fileId }).toArray();
     if (!fileInfo.length) {
       console.log(`File not found in GridFS for ID: ${fileMetadata.fileId}`);
@@ -1207,22 +1205,56 @@ app.get('/download/:category', async (req, res) => {
     }
     const fileSize = fileInfo[0].length;
 
-    console.log(`Sending file: ${fileMetadata.filename}, size: ${fileSize} bytes, hash: ${fileMetadata.hash}`);
+    const range = req.headers.range;
+    if (range) {
+      const parts = range.replace(/bytes=/, "").split("-");
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
 
-    const downloadStream = bucket.openDownloadStream(fileMetadata.fileId);
-    res.setHeader('Content-Type', 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename="${fileMetadata.filename}"`);
-    res.setHeader('Content-Length', fileSize); // Add Content-Length header
-    res.setHeader('X-File-Hash', fileMetadata.hash);
-
-    downloadStream.on('error', (err) => {
-      console.error(`Error streaming file ${fileMetadata.fileId}:`, err);
-      if (!res.headersSent) {
-        res.status(500).send('Error streaming file');
+      if (start >= fileSize || end >= fileSize || start > end) {
+        console.log(`Invalid range request: ${range}, file size: ${fileSize}`);
+        res.status(416).send('Range Not Satisfiable');
+        return;
       }
-    });
 
-    downloadStream.pipe(res);
+      console.log(`Serving range: bytes ${start}-${end}/${fileSize}, file: ${fileMetadata.filename}`);
+
+      const downloadStream = bucket.openDownloadStream(fileMetadata.fileId, { start, end: end + 1 });
+      res.status(206); // Partial Content
+      res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('Content-Disposition', `attachment; filename="${fileMetadata.filename}"`);
+      res.setHeader('Content-Length', end - start + 1);
+      res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`);
+      res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('X-File-Hash', fileMetadata.hash);
+
+      downloadStream.on('error', (err) => {
+        console.error(`Error streaming file ${fileMetadata.fileId}:`, err);
+        if (!res.headersSent) {
+          res.status(500).send('Error streaming file');
+        }
+      });
+
+      downloadStream.pipe(res);
+    } else {
+      console.log(`Sending file: ${fileMetadata.filename}, size: ${fileSize} bytes, hash: ${fileMetadata.hash}`);
+
+      const downloadStream = bucket.openDownloadStream(fileMetadata.fileId);
+      res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('Content-Disposition', `attachment; filename="${fileMetadata.filename}"`);
+      res.setHeader('Content-Length', fileSize);
+      res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('X-File-Hash', fileMetadata.hash);
+
+      downloadStream.on('error', (err) => {
+        console.error(`Error streaming file ${fileMetadata.fileId}:`, err);
+        if (!res.headersSent) {
+          res.status(500).send('Error streaming file');
+        }
+      });
+
+      downloadStream.pipe(res);
+    }
   } catch (err) {
     console.error(`Error in download endpoint for category: ${category}`, err);
     res.status(500).send('Server error');
