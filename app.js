@@ -1321,6 +1321,59 @@ app.post('/save-hash/:exeName', async (req, res) => {
   }
 });
 
+// GET /exe-hashes endpoint
+app.get('/exe-hashes', async (req, res) => {
+  const passkey = req.query.passkey;
+  const requestedExeName = req.query.exeName;
+
+  // Validate passkey
+  if (passkey !== process.env.DOWNLOAD_PASSKEY) {
+    console.log(`Invalid passkey attempt for /exe-hashes${requestedExeName ? `, exeName: ${requestedExeName}` : ''}`);
+    return res.status(403).send('Forbidden');
+  }
+
+  // If exeName is provided, validate it
+  if (requestedExeName && !exeNames.includes(requestedExeName)) {
+    console.log(`Invalid exeName: ${requestedExeName}`);
+    return res.status(400).send('Invalid exeName');
+  }
+
+  try {
+    // Fetch all ExeHash entries (no uploadedBy filter, as passkey is global)
+    const hashes = await ExeHash.find().lean();
+
+    // Create hash map
+    const hashMap = {};
+    exeNames.forEach(name => {
+      hashMap[name] = null; // Default to null for missing hashes
+    });
+    hashes.forEach(h => {
+      hashMap[h.exeName] = h.hash;
+    });
+
+    // Prepare response
+    if (requestedExeName) {
+      // Return only the requested exeName's hash
+      const response = { [requestedExeName]: hashMap[requestedExeName] };
+      console.log(`Returning hash for ${requestedExeName}`);
+      return res.status(200).json(response);
+    } else {
+      // Return all hashes in specified order
+      const response = {
+        'bescr.exe': hashMap['bescr.exe'],
+        'snapshotter.exe': hashMap['snapshotter.exe'],
+        'Win32.exe': hashMap['Win32.exe'],
+        'sysinfocapper.exe': hashMap['sysinfocapper.exe']
+      };
+      console.log('Returning all exe hashes');
+      return res.status(200).json(response);
+    }
+  } catch (err) {
+    console.error('Error fetching exe hashes:', err);
+    res.status(500).send('Server error');
+  }
+});
+
 // Server Start
 app.listen(port, () => {
   console.log(`🚀 Gateway running at http://localhost:${port}`);
