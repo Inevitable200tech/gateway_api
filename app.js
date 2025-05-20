@@ -69,13 +69,17 @@ const ApiStatusSchema = new mongoose.Schema({
   usagePercent: String,
   message: String,
   databaseStatus: String,
+  totalHeartbeatClientCount: Number,
   lastChecked: { type: Date, default: Date.now }
 });
 const ApiStatus = mongoose.model('ApiStatus', ApiStatusSchema);
 
 const ServerOrderSchema = new mongoose.Schema({
   type: { type: String, enum: ['Public', 'Private'], unique: true },
-  order: [String],
+  order: [{
+    url: String,
+    totalHeartbeatClientCount: Number
+  }],
   updatedAt: { type: Date, default: Date.now }
 });
 const ServerOrder = mongoose.model('ServerOrder', ServerOrderSchema);
@@ -88,7 +92,6 @@ const statusPriority = {
   'not reachable': 5
 };
 
-// FileMetadata Schema
 // FileMetadata Schema for uploaded .zip files
 const FileMetadataSchema = new mongoose.Schema({
   category: {
@@ -122,7 +125,7 @@ ExeHashSchema.index({ uploadedBy: 1, exeName: 1 }, { unique: true });
 
 const ExeHash = mongoose.model('ExeHash', ExeHashSchema);
 
-// GridFS setup (assuming this is part of your original setup)
+// GridFS setup
 let bucket;
 (async () => {
   const client = new MongoClient(process.env.GATEWAY_DB_URI);
@@ -203,7 +206,8 @@ async function pollApi(api) {
       status,
       usagePercent,
       message: data.message,
-      databaseStatus: data.database_Status
+      databaseStatus: data.database_Status,
+      totalHeartbeatClientCount: parseInt(data.total_Heartbeat_Client_Count, 10) || 0
     };
   } catch {
     record = {
@@ -211,10 +215,10 @@ async function pollApi(api) {
       status: 'not reachable',
       usagePercent: 'N/A',
       message: 'fetch error',
-      databaseStatus: 'N/A'
+      databaseStatus: 'N/A',
+      totalHeartbeatClientCount: 0
     };
   }
-  // update the status in the database
   await ApiStatus.findOneAndUpdate(
     { url: api.url },
     { $set: { ...record, lastChecked: new Date() } },
@@ -223,12 +227,12 @@ async function pollApi(api) {
   return record;
 }
 
-// update the ServerOrder for a given type
+// Update the ServerOrder for a given type
 async function updateOrderForType(type) {
-  // get latest status per URL of this type
   const endpoints = (await ApiEndpoint.find({ type })).map(a => a.url);
   const statuses = await ApiStatus
     .find({ url: { $in: endpoints } })
+    .select('url status totalHeartbeatClientCount')
     .sort({ lastChecked: -1 })
     .lean();
 
@@ -238,8 +242,14 @@ async function updateOrderForType(type) {
   });
 
   const newOrder = Object.values(latest)
-    .sort((a, b) => statusPriority[a.status] - statusPriority[b.status])
-    .map(r => r.url);
+    .sort((a, b) => {
+      const priorityDiff = statusPriority[a.status] - statusPriority[b.status];
+      if (priorityDiff !== 0) {
+        return priorityDiff;
+      }
+      return a.totalHeartbeatClientCount - b.totalHeartbeatClientCount;
+    })
+    .map(r => ({ url: r.url, totalHeartbeatClientCount: r.totalHeartbeatClientCount }));
 
   await ServerOrder.findOneAndUpdate(
     { type },
@@ -249,14 +259,14 @@ async function updateOrderForType(type) {
   console.log(`✅ ${type} ServerOrder updated:`, newOrder);
 }
 
-// schedule one cron per API based on its `ping` field
+// Schedule one cron per API based on its `ping` field
 async function scheduleAllApis() {
-  // stop any existing tasks
+  // Stop any existing tasks
   cron.getTasks().forEach(t => t.stop());
 
   const apis = await ApiEndpoint.find({});
   for (const api of apis) {
-    // every api.ping minutes:
+    // Every api.ping minutes:
     const spec = `*/${api.ping} * * * *`;
     cron.schedule(spec, async () => {
       console.log(`🔄 Polling ${api.type} API ${api.url}`);
@@ -266,12 +276,11 @@ async function scheduleAllApis() {
   }
 }
 
-// initial scheduling
+// Initial scheduling
 scheduleAllApis();
 
-// re-schedule when endpoints collection changes
+// Re-schedule when endpoints collection changes
 ApiEndpoint.watch().on('change', scheduleAllApis);
-
 
 
 // Login Page
@@ -964,51 +973,50 @@ app.post('/order', async (req, res) => {
     return res.status(400).json({ error: 'Must provide { server, port } in JSON body' });
   }
 
-  // decide which ordering to use
   let type;
   if (server.includes('.public')) type = 'Public';
   else if (server.includes('.private')) type = 'Private';
   else return res.status(400).json({ error: 'Server must contain .public or .private' });
 
   try {
-    // fetch the stored ordering for that type
     const doc = await ServerOrder.findOne({ type });
     if (!doc) return res.status(404).json({ error: `No ordering found for type=${type}` });
 
-    // doc.order is least-busy → most-busy; reverse it:
-    const mostToLeast = [...doc.order].reverse();
+    // Reverse the order to most-to-least busy
+    const mostToLeast = [...doc.order].reverse().map(item => ({
+      url: item.url,
+      totalHeartbeatClientCount: item.totalHeartbeatClientCount
+    }));
 
     return res.json({ type, port, order: mostToLeast });
   } catch (err) {
-    console.error('​/order error', err);
+    console.error('/order error', err);
     return res.status(500).json({ error: 'Server error' });
   }
 });
+
 app.post('/client-ip-get', async (req, res) => {
   const { server, port } = req.body;
   if (typeof server !== 'string' || !port) {
-    return res.status(400).json({ error: 'Must provide { client ip, client port } in JSON body' });
+    return res.status(400).json({ error: 'Must provide { server, port } in JSON body' });
   }
 
-  // decide which ordering to use
   let type;
   if (server.includes('.public')) type = 'Public';
   else if (server.includes('.private')) type = 'Private';
-  else return res.status(400).json({ error: 'client ip must contain .public or .private' });
+  else return res.status(400).json({ error: 'Server must contain .public or .private' });
 
   try {
-    // fetch the stored ordering for that type
     const doc = await ServerOrder.findOne({ type });
     if (!doc || !doc.order || doc.order.length === 0) {
       return res.status(404).json({ error: `No ordering found for type=${type}` });
     }
 
-    // doc.order is already least-busy → most-busy
-    const leastBusy = doc.order[0];
+    const leastBusy = doc.order[0].url; // Assuming order is least-to-most busy
 
     return res.json({ ip: leastBusy });
   } catch (err) {
-    console.error('​/client-ip-get error', err);
+    console.error('/client-ip-get error', err);
     return res.status(500).json({ error: 'Server error' });
   }
 });
