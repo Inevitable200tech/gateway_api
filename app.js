@@ -407,7 +407,7 @@ const getDashboardHTML = (username) => wrapPageContent(username, `
 
 const getAddGameScriptHTML = (username) => wrapPageContent(username, `
   <div class="pre-container>
-  <div class="container mt-5">
+    <div class="container mt-5">
     <h1 class="mb-4">Add New Game Script</h1>
     <form action="/add-game-script" method="POST" enctype="multipart/form-data">
       <div class="form-group">
@@ -433,8 +433,9 @@ const getAddGameScriptHTML = (username) => wrapPageContent(username, `
       <button type="submit" class="btn btn-primary">Add Script</button>
       <a href="/dashboard" class="btn btn-secondary">Cancel</a>
     </form>
+    </div>
   </div>
-  </div>
+
 `);
 
 // Add Sub-API Page
