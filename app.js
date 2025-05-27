@@ -400,9 +400,94 @@ const getDashboardHTML = (username) => wrapPageContent(username, `
         <h1>Update Files</h1>
         <div><hr><a href="/updater">Proceed</a></div>
       </div>
+      <div class="sub4"> <!-- Added new menu item -->
+        <h1>Manage Game Scripts</h1>
+        <div><hr><a href="/manage-game-scripts">Proceed</a></div>
+      </div>
     </div>
   </div>
 `);
+
+// New function to generate Edit Game Script page
+const getEditGameScriptHTML = async (username, scriptId) => {
+  const script = await GameScript.findOne({ _id: scriptId, uploadedBy: username }).lean();
+  if (!script) {
+    return wrapPageContent(username, '<h1>Script not found or you do not have permission to edit it.</h1>');
+  }
+  const content = `
+    <div class="pre-container">
+      <div class="container mt-5">
+        <h1 class="mb-4">Edit Game Script</h1>
+        <form action="/edit-game-script/${script._id}" method="POST" enctype="multipart/form-data">
+          <div class="form-group">
+            <label for="gameTitle">Game Title</label>
+            <input type="text" class="form-control" id="gameTitle" name="gameTitle" value="${script.gameTitle}" required>
+          </div>
+          <div class="form-group">
+            <label for="imageIcon">Current Image</label>
+            <img src="/image/${script.imageIcon}" alt="Current Image" style="max-width: 200px; display: block;">
+            <label for="imageIcon">Upload New Image (optional)</label>
+            <input type="file" class="form-control-file" id="imageIcon" name="imageIcon" accept="image/*">
+          </div>
+          <div class="form-group">
+            <label for="script">Script (Lua)</label>
+            <textarea class="form-control" id="script" name="script" rows="10" required>${script.script}</textarea>
+          </div>
+          <div class="form-group">
+            <label for="tags">Tags (comma-separated)</label>
+            <input type="text" class="form-control" id="tags" name="tags" value="${script.tags.join(', ')}">
+          </div>
+          <div class="form-group">
+            <label for="description">Description</label>
+            <textarea class="form-control" id="description" name="description" rows="4">${script.description || ''}</textarea>
+          </div>
+          <button type="submit" class="btn btn-primary">Update Script</button>
+          <a href="/manage-game-scripts" class="btn btn-secondary">Cancel</a>
+        </form>
+      </div>
+    </div>
+  `;
+  return wrapPageContent(username, content);
+};
+
+// New function to generate Manage Game Scripts page
+const getManageGameScriptsHTML = async (username) => {
+  const scripts = await GameScript.find({ uploadedBy: username }).lean();
+  const scriptRows = scripts.map(script => `
+    <tr>
+      <td>${script.gameTitle}</td>
+      <td>${script.tags.join(', ')}</td>
+      <td>${script.description || ''}</td>
+      <td>
+        <a href="/edit-game-script/${script._id}" class="btn btn-sm btn-primary">Edit</a>
+        <form action="/delete-game-script/${script._id}" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this script?')">
+          <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+        </form>
+      </td>
+    </tr>
+  `).join('');
+  const content = `
+    <div class="container mt-5">
+      <h1>Manage Game Scripts</h1>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Game Title</th>
+            <th>Tags</th>
+            <th>Description</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${scriptRows}
+        </tbody>
+      </table>
+      <a href="/dashboard" class="btn btn-secondary">Back to Dashboard</a>
+    </div>
+  `;
+  return wrapPageContent(username, content);
+};
+
 
 
 const getAddGameScriptHTML = (username) => wrapPageContent(username, `
@@ -1136,6 +1221,85 @@ app.post('/add-game-script', imageUpload.single('imageIcon'), async (req, res) =
   } catch (error) {
     console.error('Error adding game script:', error);
     res.status(500).send('Error adding game script');
+  }
+});
+
+// New route to render Manage Game Scripts page
+app.get('/manage-game-scripts', async (req, res) => {
+  if (!req.session.user) return res.redirect('/');
+  res.send(await getManageGameScriptsHTML(req.session.user));
+});
+
+// New route to render Edit Game Script page
+app.get('/edit-game-script/:id', async (req, res) => {
+  if (!req.session.user) return res.redirect('/');
+  res.send(await getEditGameScriptHTML(req.session.user, req.params.id));
+});
+
+// New route to handle game script updates
+app.post('/edit-game-script/:id', imageUpload.single('imageIcon'), async (req, res) => {
+  if (!req.session.user) return res.status(401).send('Unauthorized');
+  try {
+    const script = await GameScript.findOne({ _id: req.params.id, uploadedBy: req.session.user });
+    if (!script) {
+      return res.status(404).send('Script not found or you do not have permission to edit it.');
+    }
+    const { gameTitle, script: scriptContent, tags, description } = req.body;
+    const tagsArray = tags ? tags.split(',').map(tag => tag.trim()) : [];
+    script.gameTitle = gameTitle;
+    script.script = scriptContent;
+    script.tags = tagsArray;
+    script.description = description;
+    if (req.file) {
+      await imageBucket.delete(script.imageIcon);
+      const imageStream = Readable.from(req.file.buffer);
+      const uploadStream = imageBucket.openUploadStream(req.file.originalname);
+      imageStream.pipe(uploadStream);
+      await new Promise((resolve, reject) => {
+        uploadStream.on('finish', resolve);
+        uploadStream.on('error', reject);
+      });
+      script.imageIcon = uploadStream.id;
+    }
+    await script.save();
+    res.redirect('/manage-game-scripts');
+  } catch (error) {
+    console.error('Error updating game script:', error);
+    res.status(500).send('Error updating game script');
+  }
+});
+
+// New route to handle game script deletion
+app.post('/delete-game-script/:id', async (req, res) => {
+  if (!req.session.user) return res.status(401).send('Unauthorized');
+  try {
+    const script = await GameScript.findOne({ _id: req.params.id, uploadedBy: req.session.user });
+    if (!script) {
+      return res.status(404).send('Script not found or you do not have permission to delete it.');
+    }
+    await imageBucket.delete(script.imageIcon);
+    await GameScript.deleteOne({ _id: req.params.id });
+    res.redirect('/manage-game-scripts');
+  } catch (error) {
+    console.error('Error deleting game script:', error);
+    res.status(500).send('Error deleting game script');
+  }
+});
+
+// New route to serve images from GridFS
+app.get('/image/:id', async (req, res) => {
+  try {
+    const fileId = new mongoose.Types.ObjectId(req.params.id);
+    const downloadStream = imageBucket.openDownloadStream(fileId);
+    downloadStream.on('error', (err) => {
+      console.error('Error streaming image:', err);
+      res.status(404).send('Image not found');
+    });
+    res.setHeader('Content-Type', 'image/*');
+    downloadStream.pipe(res);
+  } catch (err) {
+    console.error('Invalid image id:', err);
+    res.status(400).send('Invalid image id');
   }
 });
 
