@@ -406,7 +406,7 @@ const getDashboardHTML = (username) => wrapPageContent(username, `
 
 
 const getAddGameScriptHTML = (username) => wrapPageContent(username, `
-  <div class="pre-container>
+  <div class="pre-container">
     <div class="container mt-5">
     <h1 class="mb-4">Add New Game Script</h1>
     <form action="/add-game-script" method="POST" enctype="multipart/form-data">
