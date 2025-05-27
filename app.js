@@ -348,6 +348,8 @@ function wrapPageContent(username, content) {
   <link href="/api-add.css" rel="stylesheet">
   <link href="/status-api.css" rel="stylesheet">
   <link href="/bootstrap.min.css" rel="stylesheet">
+  <link href="/bootstrap.min.css" rel="stylesheet">
+
 </head>
 <body>
   <header>
@@ -394,7 +396,7 @@ const getDashboardHTML = (username) => wrapPageContent(username, `
         <h1>Live Status</h1>
         <div><hr><a href="/status">Proceed</a></div>
       </div>
-      <div class="sub5">
+      <div class="sub4">
         <h1>Update Files</h1>
         <div><hr><a href="/updater">Proceed</a></div>
       </div>
