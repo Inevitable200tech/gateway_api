@@ -105,6 +105,34 @@ const FileMetadataSchema = new mongoose.Schema({
   hash: String // SHA256 hash of the .zip file for integrity check
 });
 
+let imageBucket;
+(async () => {
+  const client = new MongoClient(process.env.GATEWAY_DB_URI);
+  await client.connect();
+  const db = client.db();
+  imageBucket = new GridFSBucket(db, { bucketName: 'images' });
+})();
+
+const GameScriptSchema = new mongoose.Schema({
+  gameTitle: { type: String, required: true },
+  imageIcon: { type: mongoose.Types.ObjectId, required: true }, // Reference to GridFS
+  script: { type: String, required: true },
+  tags: [String],
+  description: String,
+  uploadedBy: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now },
+});
+const GameScript = mongoose.model('GameScript', GameScriptSchema);
+
+
+const imageUpload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (req, file, cb) => {
+    const allowed = /\.(jpg|jpeg|png|gif)$/i.test(file.originalname);
+    cb(allowed ? null : new Error('Only image files are allowed'), allowed);
+  }
+});
+
 // Unique index to ensure one file per category per user
 FileMetadataSchema.index({ uploadedBy: 1, category: 1 }, { unique: true });
 
@@ -319,6 +347,7 @@ function wrapPageContent(username, content) {
   <link href="/api-remove.css" rel="stylesheet">
   <link href="/api-add.css" rel="stylesheet">
   <link href="/status-api.css" rel="stylesheet">
+  <link href="/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
   <header>
@@ -355,17 +384,52 @@ const getDashboardHTML = (username) => wrapPageContent(username, `
         <h1>Remove Sub-API</h1>
         <div><hr><a href="/remove-api">Proceed</a></div>
       </div>
+      <div class="sub3">
+        <h1>Add Game Script</h1>
+        <div><hr><a href="/add-game-script">Proceed</a></div>
+      </div>
     </div>
     <div class="lower-wrapper">
-      <div class="sub3">
-        <h1>Live Status</h1>
-        <div><hr><a href="/status">Proceed</a></div> <!-- Fixed to /status -->
-      </div>
       <div class="sub4">
+        <h1>Live Status</h1>
+        <div><hr><a href="/status">Proceed</a></div>
+      </div>
+      <div class="sub5">
         <h1>Update Files</h1>
         <div><hr><a href="/updater">Proceed</a></div>
       </div>
     </div>
+  </div>
+`);
+
+
+const getAddGameScriptHTML = (username) => wrapPageContent(username, `
+  <div class="container mt-5">
+    <h1 class="mb-4">Add New Game Script</h1>
+    <form action="/add-game-script" method="POST" enctype="multipart/form-data">
+      <div class="form-group">
+        <label for="gameTitle">Game Title</label>
+        <input type="text" class="form-control" id="gameTitle" name="gameTitle" required>
+      </div>
+      <div class="form-group">
+        <label for="imageIcon">Image Icon</label>
+        <input type="file" class="form-control-file" id="imageIcon" name="imageIcon" accept="image/*" required>
+      </div>
+      <div class="form-group">
+        <label for="script">Script (Lua)</label>
+        <textarea class="form-control" id="script" name="script" rows="10" required></textarea>
+      </div>
+      <div class="form-group">
+        <label for="tags">Tags (comma-separated)</label>
+        <input type="text" class="form-control" id="tags" name="tags">
+      </div>
+      <div class="form-group">
+        <label for="description">Description</label>
+        <textarea class="form-control" id="description" name="description" rows="4"></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary">Add Script</button>
+      <a href="/dashboard" class="btn btn-secondary">Cancel</a>
+    </form>
   </div>
 `);
 
@@ -1027,6 +1091,49 @@ app.get('/health', (req, res) => {
 });
 
 // Routes
+
+// GET route to display the form
+app.get('/add-game-script', (req, res) => {
+  if (!req.session.user) return res.redirect('/');
+  res.send(getAddGameScriptHTML(req.session.user));
+});
+
+// POST route to handle form submission
+app.post('/add-game-script', imageUpload.single('imageIcon'), async (req, res) => {
+  if (!req.session.user) return res.status(401).send('Unauthorized');
+
+  try {
+    const { gameTitle, script, tags, description } = req.body;
+    const tagsArray = tags ? tags.split(',').map(tag => tag.trim()) : [];
+
+    // Upload image to GridFS
+    const imageStream = Readable.from(req.file.buffer);
+    const uploadStream = imageBucket.openUploadStream(req.file.originalname);
+    imageStream.pipe(uploadStream);
+
+    uploadStream.on('finish', async () => {
+      const gameScript = new GameScript({
+        gameTitle,
+        imageIcon: uploadStream.id,
+        script,
+        tags: tagsArray,
+        description,
+        uploadedBy: req.session.user,
+      });
+      await gameScript.save();
+      res.redirect('/dashboard');
+    });
+
+    uploadStream.on('error', (err) => {
+      console.error('Error uploading image:', err);
+      res.status(500).send('Error uploading image');
+    });
+  } catch (error) {
+    console.error('Error adding game script:', error);
+    res.status(500).send('Error adding game script');
+  }
+});
+
 app.get('/updater', async (req, res) => {
   if (!req.session.user) {
     console.log('Unauthorized access to /updater');
