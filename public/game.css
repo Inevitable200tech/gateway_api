@@ -1,7 +1,7 @@
-.pre-container{
-    background:white;
-    padding:4vw;
-    width:95%;
+.pre-container {
+    background: white;
+    width: 90%;
     display: flex;
     justify-self: center;
+    border-radius: 1vw;
 }
