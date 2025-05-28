@@ -1,7 +1,10 @@
-.pre-container {
+.pre-container-list{
   display: flex;
   justify-self: center;
   padding:3vw;
-  background: #fff;
-  min-height: 50vh;
+  background: #000;
+  height: 50vh;
+}
+.pre-container-list th,.pre-container-list h1{
+    color:#fff;
 }

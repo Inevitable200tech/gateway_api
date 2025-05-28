@@ -402,7 +402,7 @@ const getDashboardHTML = (username) => wrapPageContent(username, `
         <div><hr><a href="/updater">Proceed</a></div>
       </div>
       <div class="sub4"> <!-- Added new menu item -->
-        <h1>Manage Game Scripts</h1>
+        <h1>Manage Scripts</h1>
         <div><hr><a href="/manage-game-scripts">Proceed</a></div>
       </div>
     </div>
@@ -468,7 +468,7 @@ const getManageGameScriptsHTML = async (username) => {
     </tr>
   `).join('');
   const content = `
-  <div class="pre-container">
+  <div class="pre-container-list">
     <div class="container mt-5">
       <h1>Manage Game Scripts</h1>
       <table class="table">

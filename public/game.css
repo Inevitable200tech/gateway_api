@@ -1,7 +1,11 @@
 .pre-container {
-    background: white;
+    background: #000;
     width: 90%;
     display: flex;
     justify-self: center;
     border-radius: 1vw;
+}
+.pre-container textarea,.pre-container input{
+    background:#000;
+    color: #fff;
 }
