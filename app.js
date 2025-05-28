@@ -349,6 +349,7 @@ function wrapPageContent(username, content) {
   <link href="/status-api.css" rel="stylesheet">
   <link href="/bootstrap.min.css" rel="stylesheet">
   <link href="/game.css" rel="stylesheet">
+  <link href="/game-list.css" rel="stylesheet">
 
 </head>
 <body>
@@ -467,6 +468,7 @@ const getManageGameScriptsHTML = async (username) => {
     </tr>
   `).join('');
   const content = `
+  <div class="pre-container">
     <div class="container mt-5">
       <h1>Manage Game Scripts</h1>
       <table class="table">
@@ -484,6 +486,7 @@ const getManageGameScriptsHTML = async (username) => {
       </table>
       <a href="/dashboard" class="btn btn-secondary">Back to Dashboard</a>
     </div>
+  </div>
   `;
   return wrapPageContent(username, content);
 };

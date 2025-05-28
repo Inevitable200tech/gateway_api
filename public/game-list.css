@@ -1,0 +1,6 @@
+.pre-container {
+  display: flex;
+  justify-self: center;
+  padding:3vw;
+  background: #fff;
+}
