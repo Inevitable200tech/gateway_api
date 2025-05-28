@@ -174,13 +174,13 @@ main {
 	}
 }
 
-footer {
+.footer {
 	background: #000;
 	width: 100%;
 	position: absolute;
 }
 
-footer h2 {
+.footer h2 {
 	color: #fff;
 	font: 1.5vw 'Manjari Bold';
 	text-align: center;

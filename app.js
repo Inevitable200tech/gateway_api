@@ -343,14 +343,13 @@ function wrapPageContent(username, content) {
 <head>
   <meta charset="UTF-8">
   <title>Dashboard</title>
-  <link href="/bootstrap.min.css" rel="stylesheet">
-  <link href="/game.css" rel="stylesheet">
-  <link href="/game-list.css" rel="stylesheet">
    <link href="/dashboard.css" rel="stylesheet">
   <link href="/api-remove.css" rel="stylesheet">
   <link href="/api-add.css" rel="stylesheet">
   <link href="/status-api.css" rel="stylesheet">
-
+  <link href="/bootstrap.min.css" rel="stylesheet">
+  <link href="/game.css" rel="stylesheet">
+  <link href="/game-list.css" rel="stylesheet">
 </head>
 <body>
   <header>
@@ -365,7 +364,7 @@ function wrapPageContent(username, content) {
     </div>
   </header>
   <main>${content}</main>
-  <footer><h2>Created By Inevitable Studios</h2></footer>
+  <footer class="footer"><h2>Created By Inevitable Studios</h2></footer>
   <script>
     const usernameLength = "${username}".length;
     const newGap = 66 - (usernameLength * 0.5);
@@ -468,6 +467,7 @@ const getManageGameScriptsHTML = async (username) => {
     </tr>
   `).join('');
   const content = `
+  
   <div class="pre-container-list">
     <div class="container mt-5">
       <h1>Manage Game Scripts</h1>
