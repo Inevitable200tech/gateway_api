@@ -3,7 +3,7 @@
   justify-self: center;
   padding:3vw;
   background: #000;
-  height: 50vh;
+  height: 70vh;
 }
 .pre-container-list th,.pre-container-list{
     color:#fff;
@@ -11,3 +11,10 @@
 .container{
     width:90vw;
 }
+.table{
+    height: 30vh;
+}
+.table th,.table td{
+    color:#fff;
+}
+.
