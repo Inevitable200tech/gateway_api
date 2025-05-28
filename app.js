@@ -343,13 +343,13 @@ function wrapPageContent(username, content) {
 <head>
   <meta charset="UTF-8">
   <title>Dashboard</title>
-  <link href="/dashboard.css" rel="stylesheet">
-  <link href="/api-remove.css" rel="stylesheet">
-  <link href="/api-add.css" rel="stylesheet">
-  <link href="/status-api.css" rel="stylesheet">
   <link href="/bootstrap.min.css" rel="stylesheet">
   <link href="/game.css" rel="stylesheet">
   <link href="/game-list.css" rel="stylesheet">
+   <link href="/dashboard.css" rel="stylesheet">
+  <link href="/api-remove.css" rel="stylesheet">
+  <link href="/api-add.css" rel="stylesheet">
+  <link href="/status-api.css" rel="stylesheet">
 
 </head>
 <body>
