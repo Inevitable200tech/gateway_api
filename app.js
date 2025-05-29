@@ -1823,6 +1823,11 @@ app.get('/api/game-script/:id', async (req, res) => {
   }
 });
 
+app.get('/game-detail/:id', (req, res) => {
+  const scriptId = req.params.id;
+  res.redirect(`http://localhost:8080/game-detail/${scriptId}`);
+});
+
 
 // Server Start
 app.listen(port, () => {
