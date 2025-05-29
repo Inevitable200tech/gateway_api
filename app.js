@@ -411,48 +411,75 @@ const getDashboardHTML = (username) => wrapPageContent(username, `
 `);
 
 // New function to generate Edit Game Script page
-const getEditGameScriptHTML = async (username, scriptId) => {
-  const script = await GameScript.findOne({ _id: scriptId, uploadedBy: username }).lean();
-  if (!script) {
-    return wrapPageContent(username, '<h1>Script not found or you do not have permission to edit it.</h1>');
-  }
-  const content = `
+const getEditGameScriptHTML = async (scriptId) => {
+  const script = await GameScript.findById(scriptId).lean();
+  if (!script) return '<h1>Script not found</h1>';
 
-    <article>
-    <div class="pre-container">
-      <div class="container mt-5">
-        <h1 class="mb-4">Edit Game Script</h1>
-        <form action="/edit-game-script/${script._id}" method="POST" enctype="multipart/form-data">
-          <div class="form-group">
-            <label for="gameTitle">Game Title</label>
-            <input type="text" class="form-control" id="gameTitle" name="gameTitle" value="${script.gameTitle}" required>
-          </div>
-          <div class="form-group">
-            <label for="imageIcon">Current Image</label>
-            <img src="/image/${script.imageIcon}" alt="Current Image" style="max-width: 200px; display: block;">
-            <label for="imageIcon">Upload New Image (optional)</label>
-            <input type="file" class="form-control-file" id="imageIcon" name="imageIcon" accept="image/*">
-          </div>
-          <div class="form-group">
-            <label for="script">Script (Lua)</label>
-            <textarea class="form-control" id="script" name="script" rows="10" required>${script.script}</textarea>
-          </div>
-          <div class="form-group">
-            <label for="tags">Tags (comma-separated)</label>
-            <input type="text" class="form-control" id="tags" name="tags" value="${script.tags.join(', ')}">
-          </div>
-          <div class="form-group">
-            <label for="description">Description</label>
-            <textarea class="form-control" id="description" name="description" rows="4">${script.description || ''}</textarea>
-          </div>
-          <button type="submit" class="btn btn-primary">Update Script</button>
-          <a href="/manage-game-scripts" class="btn btn-secondary">Cancel</a>
-        </form>
-      </div>
+  const content = `
+    <div class="container mt-5">
+      <h1>Edit Game Script</h1>
+      <form id="editScriptForm" action="/edit-game-script/${script._id}" method="POST">
+        <div class="mb-3">
+          <label for="gameTitle" class="form-label">Game Title</label>
+          <input type="text" class="form-control" id="gameTitle" name="gameTitle" value="${script.gameTitle}" required>
+        </div>
+        <div class="mb-3">
+          <label for="tags" class="form-label">Tags (comma-separated)</label>
+          <input type="text" class="form-control" id="tags" name="tags" value="${script.tags.join(', ')}" required>
+        </div>
+        <div class="mb-3">
+          <label for="description" class="form-label">Description (max 2 words)</label>
+          <textarea class="form-control" id="description" name="description" rows="3" required>${script.description}</textarea>
+          <small id="wordCount" class="form-text text-muted">0/2 words</small>
+          <div id="descriptionError" class="text-danger" style="display:none;">Description must be 2 words or fewer.</div>
+        </div>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+        <a href="/manage-game-scripts" class="btn btn-secondary">Cancel</a>
+      </form>
+      <script>
+        const descriptionTextarea = document.getElementById('description');
+        const wordCountSpan = document.getElementById('wordCount');
+        const descriptionError = document.getElementById('descriptionError');
+        const wordLimit = 2;
+
+        function updateWordCount() {
+          const text = descriptionTextarea.value.trim();
+          const words = text ? text.split(/\s+/) : [];
+          const wordCount = words.length;
+          wordCountSpan.textContent = \`\${wordCount}/\${wordLimit} words\`;
+          if (wordCount > wordLimit) {
+            wordCountSpan.classList.add('text-danger');
+            descriptionError.style.display = 'block';
+          } else {
+            wordCountSpan.classList.remove('text-danger');
+            descriptionError.style.display = 'none';
+          }
+        }
+
+        descriptionTextarea.addEventListener('input', function() {
+          let text = this.value.trim();
+          const words = text ? text.split(/\s+/) : [];
+          if (words.length > wordLimit) {
+            this.value = words.slice(0, wordLimit).join(' ') + ' ';
+          }
+          updateWordCount();
+        });
+
+        document.getElementById('editScriptForm').addEventListener('submit', function(e) {
+          const text = descriptionTextarea.value.trim();
+          const words = text ? text.split(/\s+/) : [];
+          if (words.length > wordLimit) {
+            e.preventDefault();
+            descriptionError.style.display = 'block';
+          }
+        });
+
+        // Initial word count update
+        updateWordCount();
+      </script>
     </div>
-    </article>
   `;
-  return wrapPageContent(username, content);
+  return wrapPageContent(script.uploadedBy, content);
 };
 
 // New function to generate Manage Game Scripts page
