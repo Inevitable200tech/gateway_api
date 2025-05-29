@@ -1331,14 +1331,25 @@ app.post('/edit-game-script/:id', imageUpload.single('imageIcon'), async (req, r
     if (!script) {
       return res.status(404).send('Script not found or you do not have permission to edit it.');
     }
+
     const { gameTitle, script: scriptContent, tags, description } = req.body;
-    const tagsArray = tags ? tags.split(',').map(tag => tag.trim()) : [];
+
+    // Validate required fields
+    if (!gameTitle || !scriptContent) {
+      return res.status(400).send('Game title and script are required.');
+    }
+
+    // Update fields
     script.gameTitle = gameTitle;
     script.script = scriptContent;
-    script.tags = tagsArray;
-    script.description = description;
+    script.tags = tags ? tags.split(',').map(tag => tag.trim()) : [];
+    script.description = description || '';
+
+    // Handle image upload if provided
     if (req.file) {
+      // Delete old image
       await imageBucket.delete(script.imageIcon);
+      // Upload new image
       const imageStream = Readable.from(req.file.buffer);
       const uploadStream = imageBucket.openUploadStream(req.file.originalname);
       imageStream.pipe(uploadStream);
@@ -1348,11 +1359,12 @@ app.post('/edit-game-script/:id', imageUpload.single('imageIcon'), async (req, r
       });
       script.imageIcon = uploadStream.id;
     }
+
     await script.save();
     res.redirect('/manage-game-scripts');
   } catch (error) {
     console.error('Error updating game script:', error);
-    res.status(500).send('Error updating game script');
+    res.status(500).send(`Error updating game script: ${error.message}`);
   }
 });
 
