@@ -3,7 +3,8 @@
   justify-self: center;
   padding:3vw;
   background: #000;
-  height: 70vh;
+  height: auto;
+  min-height: 70vh;
 }
 .pre-container-list th,.pre-container-list{
     color:#fff;
