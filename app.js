@@ -411,7 +411,7 @@ const getDashboardHTML = (username) => wrapPageContent(username, `
 `);
 
 // New function to generate Edit Game Script page
-const getEditGameScriptHTML = async (scriptId) => {
+const getEditGameScriptHTML = async (username, scriptId) => {
   const script = await GameScript.findById(scriptId).lean();
   if (!script) return '<h1>Script not found</h1>';
 
@@ -479,7 +479,7 @@ const getEditGameScriptHTML = async (scriptId) => {
       </script>
     </div>
   `;
-  return wrapPageContent(script.uploadedBy, content);
+  return wrapPageContent(username, content);
 };
 
 // New function to generate Manage Game Scripts page
