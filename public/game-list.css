@@ -17,3 +17,7 @@
 .table th,.table td{
     color:#fff;
 }
+main{
+    display: flex;
+    justify-content: center;
+}
