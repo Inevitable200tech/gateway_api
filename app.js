@@ -10,6 +10,7 @@ import MongoStore from 'connect-mongo';
 import multer from 'multer';
 import { MongoClient, GridFSBucket } from 'mongodb';
 import { Readable } from 'stream';
+import cors from 'cors';
 
 
 dotenv.config({ path: 'cert.env' });
@@ -21,6 +22,7 @@ const port = process.env.PORT || 3000;
 const sessionSecret = crypto.randomBytes(64).toString('hex');
 
 // Middleware
+app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
