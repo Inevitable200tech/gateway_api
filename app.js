@@ -11,10 +11,13 @@ import multer from 'multer';
 import { MongoClient, GridFSBucket } from 'mongodb';
 import { Readable } from 'stream';
 import cors from 'cors';
-
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
 dotenv.config({ path: 'cert.env' });
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 const app = express();
 const port = process.env.PORT || 3000;
 
@@ -1821,7 +1824,6 @@ app.get('/api/game-script/:id', async (req, res) => {
 });
 
 app.get('/game-detail/:id', (req, res) => {
-  // Optional: if (!req.session.user) return res.redirect('/login');
   res.sendFile('public/details.html', { root: __dirname });
 });
 
