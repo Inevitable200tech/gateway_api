@@ -1291,14 +1291,24 @@ app.post('/delete-game-script/:id', async (req, res) => {
 
 // New route to serve images from GridFS
 app.get('/image/:id', async (req, res) => {
+  if (!imageBucket) {
+    console.error('Image bucket not initialized');
+    return res.status(503).send('Service unavailable');
+  }
   try {
     const fileId = new mongoose.Types.ObjectId(req.params.id);
+    const files = await imageBucket.find({ _id: fileId }).toArray();
+    if (!files.length) {
+      console.error(`Image not found for ID: ${fileId}`);
+      return res.status(404).send('Image not found');
+    }
+    const mimeType = files[0].contentType || 'image/jpeg'; // Default to JPEG if unknown
     const downloadStream = imageBucket.openDownloadStream(fileId);
     downloadStream.on('error', (err) => {
       console.error('Error streaming image:', err);
       res.status(404).send('Image not found');
     });
-    res.setHeader('Content-Type', 'image/*');
+    res.setHeader('Content-Type', mimeType);
     downloadStream.pipe(res);
   } catch (err) {
     console.error('Invalid image id:', err);
@@ -1660,6 +1670,39 @@ app.get('/exe-hashes', async (req, res) => {
     res.status(500).send('Server error');
   }
 });
+
+app.get('/api/game-scripts', async (req, res) => {
+  const { sort = 'createdAt', order = 'desc', limit = 10, skip = 0, tags } = req.query;
+  const query = {};
+  if (tags) {
+    query.tags = { $in: tags.split(',') }; // Filter by comma-separated tags
+  }
+  try {
+    const scripts = await GameScript.find(query)
+      .sort({ [sort]: order === 'desc' ? -1 : 1 }) // Sort by specified field
+      .skip(parseInt(skip)) // Skip for pagination
+      .limit(parseInt(limit)) // Limit for pagination
+      .lean(); // Return plain JavaScript objects
+    const total = await GameScript.countDocuments(query); // Total count for pagination
+    res.json({ scripts, total });
+  } catch (error) {
+    console.error('Error fetching game scripts:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.get('/api/game-script/:id', async (req, res) => {
+  try {
+    const script = await GameScript.findById(req.params.id).lean();
+    if (!script) return res.status(404).json({ error: 'Script not found' });
+    res.json(script);
+  } catch (error) {
+    console.error('Error fetching game script:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+
 
 // Server Start
 app.listen(port, () => {
