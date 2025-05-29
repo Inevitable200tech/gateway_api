@@ -499,6 +499,7 @@ const getManageGameScriptsHTML = async (username) => {
 
 
 const getAddGameScriptHTML = (username) => wrapPageContent(username, `
+  <article>
   <div class="pre-container">
     <div class="container mt-5">
     <h1 class="mb-4">Add New Game Script</h1>
@@ -528,7 +529,7 @@ const getAddGameScriptHTML = (username) => wrapPageContent(username, `
     </form>
     </div>
   </div>
-
+  </article>
 `);
 
 // Add Sub-API Page
