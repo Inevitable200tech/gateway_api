@@ -126,6 +126,7 @@ const GameScriptSchema = new mongoose.Schema({
   description: String,
   uploadedBy: { type: String, required: true },
   createdAt: { type: Date, default: Date.now },
+  views: { type: Number, default: 0 } // Added to track views
 });
 const GameScript = mongoose.model('GameScript', GameScriptSchema);
 
@@ -1814,10 +1815,17 @@ app.get('/api/game-scripts', async (req, res) => {
 
 app.get('/api/game-script/:id', async (req, res) => {
   try {
-    const script = await GameScript.findById(req.params.id).lean();
+    const script = await GameScript.findOneAndUpdate(
+      { _id: req.params.id },
+      { $inc: { views: 1 } },
+      { new: true }
+    ).lean();
     if (!script) return res.status(404).json({ error: 'Script not found' });
     res.json(script);
   } catch (error) {
+    if (error.name === 'CastError') {
+      return res.status(400).json({ error: 'Invalid script ID' });
+    }
     console.error('Error fetching game script:', error);
     res.status(500).json({ error: 'Server error' });
   }
