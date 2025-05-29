@@ -128,6 +128,7 @@ const GameScriptSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
   views: { type: Number, default: 0 } // Added to track views
 });
+GameScriptSchema.index({ views: -1 });
 const GameScript = mongoose.model('GameScript', GameScriptSchema);
 
 
@@ -1795,17 +1796,24 @@ app.get('/exe-hashes', async (req, res) => {
 
 app.get('/api/game-scripts', async (req, res) => {
   const { sort = 'createdAt', order = 'desc', limit = 10, skip = 0, tags } = req.query;
+  
+  // Validate sort field
+  const validSortFields = ['createdAt', 'views', 'gameTitle'];
+  if (!validSortFields.includes(sort)) {
+    return res.status(400).json({ error: 'Invalid sort field' });
+  }
+
   const query = {};
   if (tags) {
-    query.tags = { $in: tags.split(',') }; // Filter by comma-separated tags
+    query.tags = { $in: tags.split(',') };
   }
   try {
     const scripts = await GameScript.find(query)
-      .sort({ [sort]: order === 'desc' ? -1 : 1 }) // Sort by specified field
-      .skip(parseInt(skip)) // Skip for pagination
-      .limit(parseInt(limit)) // Limit for pagination
-      .lean(); // Return plain JavaScript objects
-    const total = await GameScript.countDocuments(query); // Total count for pagination
+      .sort({ [sort]: order === 'desc' ? -1 : 1 })
+      .skip(parseInt(skip))
+      .limit(parseInt(limit))
+      .lean();
+    const total = await GameScript.countDocuments(query);
     res.json({ scripts, total });
   } catch (error) {
     console.error('Error fetching game scripts:', error);
