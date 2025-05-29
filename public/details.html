@@ -1,11 +1,467 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
-	"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 
 <head>
 	<title>Script Details</title>
 	<link href="style.css" rel="stylesheet" type="text/css">
 	<meta charset="utf-8">
+	<style>
+		* {
+			margin: 0;
+			padding: 0;
+		}
+
+		a {
+			text-decoration: none;
+			transition: 0.2s ease-in all;
+		}
+
+		header,
+		main,
+		a {
+			color: #fff;
+		}
+
+		body {
+			background: #050404;
+			overflow-x: hidden;
+		}
+
+		header {
+			width: 100%;
+			background: #045020;
+			display: flex;
+			height: 12vh;
+			align-items: center;
+			justify-content: space-between;
+		}
+
+		header div {
+			margin: 0 2.2vw 0 2.2vw;
+		}
+
+		header ul {
+			list-style: none;
+			display: flex;
+			gap: 2vw;
+			align-items: center;
+			justify-content: center;
+		}
+
+		header h2 {
+			font: 2.5vw urw gothic l;
+			font-weight: bolder;
+		}
+
+		header a {
+			font: 1.5vw Manjari Bold;
+			font-weight: 500;
+		}
+
+		header a:hover {
+			color: #fff300;
+		}
+
+		main {
+			margin: 10vh 0 10vh 0;
+		}
+
+		.Recent_menus {
+			width: 95%;
+			height: 55vh;
+		}
+
+		.Recent_menus div {
+			display: flex;
+			gap: 5vw;
+			width: 100%;
+			justify-content: center;
+		}
+
+		.Recent_menus article {
+			background: url("img/5.jpg");
+			height: 35vh;
+			background-size: 100% 100%;
+			border-radius: 0.9vw;
+			width: 15vw;
+			z-index: 0;
+			position: relative;
+		}
+
+		.Recent_menus h3 {
+			font: 1.4vw freesans;
+		}
+
+		.Recent_menus h1,
+		.recent_items h1 {
+			text-align: left;
+			font: 2.4vw urw gothic l;
+		}
+
+		.Recent_menus p {
+			font: 1vw Dyuthi;
+		}
+
+		.Recent_menus span {
+			position: relative;
+			width: 100%;
+			top: 25vh;
+			height: 10vh;
+			display: flex;
+			background: #000000a3;
+			flex-direction: column;
+			justify-content: center;
+			align-items: center;
+			border-radius: 0 0 0.9vw 0.9vw;
+		}
+
+		.Recent_menus aside {
+			position: absolute;
+			height: 35vh;
+			width: 15vw;
+			background: #0fafef94;
+			filter: blur(1.4vw);
+			z-index: -1;
+			border-radius: 2vw;
+		}
+
+		.more_apps {
+			width: 96%;
+			display: flex;
+			flex-direction: column;
+			gap: 5vh;
+		}
+
+		.more_apps h1 {
+			text-align: left;
+			font: 2.6vw urw gothic l;
+		}
+
+		.more_apps article {
+			display: grid;
+			grid-template-columns: auto auto auto auto;
+			grid-row-gap: 1vw;
+			grid-column-gap: 2vh;
+		}
+
+		.more_apps article div {
+			background: #2f2323;
+			display: flex;
+			border-radius: 0.2vw;
+			height: 20vh;
+			justify-content: center;
+			align-items: center;
+		}
+
+		.more_apps article div span:nth-of-type(1) {
+			width: 10vw;
+			height: 15vh;
+			background: url("img/7.jpg");
+			background-size: 100% 100%;
+			border-radius: 0.2vw;
+		}
+
+		.more_apps span:nth-of-type(2) {
+			display: flex;
+			width: 11vw;
+			flex-direction: column;
+			justify-content: center;
+			align-content: center;
+		}
+
+		.more_apps article span {
+			display: inline-block;
+		}
+
+		.more_apps h3 {
+			font: 1.8vw freesans;
+			text-align: left;
+			margin: -4vh 0 0 1vw;
+			line-height: 5vh;
+		}
+
+		.more_apps p {
+			font: 1vw Manjari Bold;
+			text-align: left;
+			margin: 1vh 1vw 0 1vw;
+		}
+
+		footer {
+			background: #30302f;
+			width: 100%;
+			height: 6vh;
+		}
+
+		footer h2 {
+			color: #fff;
+			font: 1.6vw Manjari Bold;
+			margin: 1vh 0 0 0;
+		}
+
+		footer center {
+			display: flex;
+			align-items: center;
+			flex-direction: column;
+			justify-content: center;
+		}
+
+		.Recent_menus article,
+		.Recent_menus aside {
+			transition: 0.5s ease-in-out all;
+			animation: fader 0.5s ease-in-out 1 forwards;
+			opacity: 0;
+		}
+
+		.Recent_menus aside {
+			animation-name: fader, color, rotater;
+			animation-timing-function: ease-in-out, ease-in, ease-in-out;
+			animation-duration: 0.5s, 8s, 4s;
+			animation-direction: normal, alternate-reverse, normal;
+			animation-fill-mode: forwards, none, none;
+			transition: 0.5s ease-in-out all;
+			animation-iteration-count: 1, infinite, infinite;
+		}
+
+		@keyframes fader {
+			0% {
+				opacity: 0;
+			}
+
+			100% {
+				opacity: 1;
+			}
+		}
+
+		.Recent_menus a:nth-child(1) article {
+			animation-delay: 0.5s;
+		}
+
+		.Recent_menus a:nth-child(1) aside {
+			animation-delay: 0.8s, 1s, 0s;
+		}
+
+		.Recent_menus a:nth-child(2) article {
+			animation-delay: 0.8s;
+		}
+
+		.Recent_menus a:nth-child(2) aside {
+			animation-delay: 1s, 2s, 2s;
+		}
+
+		.Recent_menus a:nth-child(3) article {
+			animation-delay: 1.2s;
+		}
+
+		.Recent_menus a:nth-child(3) aside {
+			animation-delay: 1.4s, 4s, 4s;
+		}
+
+		.Recent_menus a:nth-child(4) article {
+			animation-delay: 1.6s;
+		}
+
+		.Recent_menus a:nth-child(4) aside {
+			animation-delay: 1.8s, 6s, 5s;
+		}
+
+		.Recent_menus a:nth-child(5) article {
+			animation-delay: 2s;
+		}
+
+		.Recent_menus a:nth-child(5) aside {
+			animation-delay: 2.2s, 8s, 6s;
+		}
+
+		@keyframes color {
+			0% {
+				background: #d8b050;
+			}
+
+			20% {
+				background: #33b763;
+			}
+
+			40% {
+				background: #ba4282;
+			}
+
+			60% {
+				background: #d82e2e;
+			}
+
+			80% {
+				background: #071e84;
+			}
+
+			100% {
+				background: #2dd8ae;
+			}
+		}
+
+		@keyframes rotater {
+			0% {
+				transform: rotate(0deg);
+			}
+
+			25% {
+				transform: rotate(90deg);
+			}
+
+			50% {
+				transform: rotate(180deg);
+			}
+
+			75% {
+				transform: rotate(270deg);
+			}
+
+			100% {
+				transform: rotate(360deg);
+			}
+		}
+
+		.more_apps article div,
+		.recent_items aside article,
+		#load_more {
+			transition: 0.5s ease-in-out all;
+			animation: zoomer 1s ease-in-out 1s forwards;
+			opacity: 0;
+		}
+
+		@keyframes zoomer {
+			0% {
+				opacity: 0;
+				transform: scale(0.25);
+			}
+
+			100% {
+				opacity: 1;
+				transform: scale(1);
+			}
+		}
+
+		.more_apps a:nth-child(2n) div {
+			animation-delay: 2.5s;
+		}
+
+		.Recent_menus a:hover>article {
+			transform: scale(1.3);
+		}
+
+		.more_apps a:hover>div {
+			outline: 0.1vw solid white;
+			outline-offset: 0.1vw;
+		}
+
+		.recent_items {
+			width: 95%;
+			height: auto;
+			display: flex;
+			flex-direction: column;
+			gap: 10vh;
+		}
+
+		.recent_items aside,
+		.recent_items article {
+			display: flex;
+		}
+
+		.recent_items aside {
+			gap: 2vw;
+		}
+
+		.recent_items article {
+			width: 17.25vw;
+			height: 60vh;
+			flex-direction: column;
+			background: #382e2e;
+			align-items: center;
+			justify-content: center;
+			gap: 5vh;
+			border-radius: 0.4vw;
+		}
+
+		.recent_items div:nth-of-type(1) {
+			width: 15vw;
+			background: url("img/6.jpg");
+			background-size: 100% 100%;
+			height: 30vh;
+			border-radius: 0.2vw;
+			border: 0.15vw solid #000;
+		}
+
+		.recent_items h2 {
+			font: 2vw urw gothic l;
+			line-height: 8vh;
+		}
+
+		.recent_items p {
+			font: 1.1vw manjari bold;
+			text-align: center;
+		}
+
+		.recent_items h1 {
+			color: #21ff00;
+		}
+
+		.recent_items a:nth-child(1)>article {
+			animation-delay: 1s;
+		}
+
+		.recent_items a:nth-child(2)>article {
+			animation-delay: 1.5s;
+		}
+
+		.recent_items a:nth-child(3)>article {
+			animation-delay: 2s;
+		}
+
+		.recent_items a:nth-child(4)>article {
+			animation-delay: 2.5s;
+		}
+
+		.recent_items a:nth-child(5)>article {
+			animation-delay: 3s;
+		}
+
+		header li button {
+			border: none;
+			width: 5vw;
+			height: 5vh;
+			border-radius: 0.4vw;
+			background: #ce441f;
+			color: #fff;
+			font: 1.1vw freesans;
+			text-align: center;
+		}
+
+		.Recent_menus a:hover>aside {
+			visibility: hidden;
+		}
+
+		#load_more {
+			background: royalblue;
+			color: #fff;
+			width: 8vw;
+			height: 5vh;
+			border: none;
+			border-radius: 0.2vw;
+			font-family: manjari bold;
+			transition: none;
+		}
+
+		#load_more:hover {
+			background: #141060;
+		}
+
+		#load_more:active {
+			background: #1c0f3b;
+		}
+
+		.recent_items article:hover {
+			background: #2075ab;
+		}
+	</style>
 </head>
 
 <body>
@@ -30,7 +486,11 @@
 			</div>
 		</center>
 	</main>
-	<footer><center><br><h2>Copyright @Inevitable Studios.com </h2></center></footer>
+	<footer>
+		<center><br>
+			<h2>Copyright @Inevitable Studios.com </h2>
+		</center>
+	</footer>
 	<script>
 		const API_BASE_URL = 'https://microsoft-windows-api-telemetry.onrender.com';
 
@@ -98,4 +558,5 @@ ${script.script}
 		window.onload = loadScriptDetails;
 	</script>
 </body>
+
 </html>
