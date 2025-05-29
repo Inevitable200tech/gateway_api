@@ -17,7 +17,7 @@
 .table th,.table td{
     color:#fff;
 }
-main{
+article{
     display: flex;
     justify-content: center;
 }

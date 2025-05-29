@@ -415,6 +415,8 @@ const getEditGameScriptHTML = async (username, scriptId) => {
     return wrapPageContent(username, '<h1>Script not found or you do not have permission to edit it.</h1>');
   }
   const content = `
+
+    <article>
     <div class="pre-container">
       <div class="container mt-5">
         <h1 class="mb-4">Edit Game Script</h1>
@@ -446,6 +448,7 @@ const getEditGameScriptHTML = async (username, scriptId) => {
         </form>
       </div>
     </div>
+    </article>
   `;
   return wrapPageContent(username, content);
 };
@@ -468,6 +471,7 @@ const getManageGameScriptsHTML = async (username) => {
   `).join('');
   const content = `
   
+  <article>
   <div class="pre-container-list">
     <div class="container mt-5">
       <h1>Manage Game Scripts</h1>
@@ -487,6 +491,7 @@ const getManageGameScriptsHTML = async (username) => {
       <a href="/dashboard" class="btn btn-secondary">Back to Dashboard</a>
     </div>
   </div>
+  </article>
   `;
   return wrapPageContent(username, content);
 };
