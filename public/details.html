@@ -505,7 +505,7 @@
 
 				const detailsDiv = document.getElementById('script-details');
 				detailsDiv.innerHTML = `
-					<h1 style="font: 2.6vw urw gothic l; text-align: left; margin-bottom: 5vh;">
+					<h1>
 						${script.gameTitle}
 					</h1>
 					<div style="display: flex; gap: 5vw; align-items: flex-start;">
@@ -513,34 +513,34 @@
 						     style="width: 20vw; height: 40vh; border-radius: 0.4vw; object-fit: cover;" 
 						     alt="${script.gameTitle}">
 						<div style="flex: 1; text-align: left;">
-							<h3 style="font: 1.8vw freesans; margin-bottom: 2vh;">
+							<h3>
 								Description
 							</h3>
-							<p style="font: 1.2vw Manjari Bold; margin-bottom: 4vh;">
+							<p >
 								${script.description || 'No description provided'}
 							</p>
-							<h3 style="font: 1.8vw freesans; margin-bottom: 2vh;">
+							<h3 >
 								Script
 							</h3>
 							<pre style="background: #2f2323; color: #fff; padding: 2vw; border-radius: 0.4vw; font: 1vw monospace; max-height: 50vh; overflow-y: auto;">
 ${script.script}
 							</pre>
-							<h3 style="font: 1.8vw freesans; margin: 4vh 0 2vh;">
+							<h3>
 								Tags
 							</h3>
-							<p style="font: 1.2vw Manjari Bold;">
+							<p>
 								${script.tags.length ? script.tags.join(', ') : 'No tags'}
 							</p>
-							<h3 style="font: 1.8vw freesans; margin: 4vh 0 2vh;">
+							<h3>
 								Uploaded By
 							</h3>
-							<p style="font: 1.2vw Manjari Bold;">
+							<p >
 								${script.uploadedBy}
 							</p>
-							<h3 style="font: 1.8vw freesans; margin: 4vh 0 2vh;">
+							<h3 >
 								Created
 							</h3>
-							<p style="font: 1.2vw Manjari Bold;">
+							<p >
 								${new Date(script.createdAt).toLocaleDateString()}
 							</p>
 						</div>
