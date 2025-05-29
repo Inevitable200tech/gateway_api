@@ -1821,7 +1821,8 @@ app.get('/api/game-script/:id', async (req, res) => {
 });
 
 app.get('/game-detail/:id', (req, res) => {
-  res.send('details.html');
+  // Optional: if (!req.session.user) return res.redirect('/login');
+  res.sendFile('public/details.html', { root: __dirname });
 });
 
 // Server Start

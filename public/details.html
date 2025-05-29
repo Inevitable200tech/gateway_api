@@ -1,0 +1,101 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+	"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+
+<head>
+	<title>Script Details</title>
+	<link href="style.css" rel="stylesheet" type="text/css">
+	<meta charset="utf-8">
+</head>
+
+<body>
+	<header>
+		<div>
+			<h2>Roblox Scripts</h2>
+		</div>
+		<div>
+			<ul>
+				<li><a href="index.html">Home</a></li>
+				<li><a href="recent.html">Recent Scripts</a></li>
+				<li><a href="popular.html">Popular Scripts</a></li>
+				<li><a href="saved.html">Your Saved Scripts</a></li>
+				<li><button>Search</button></li>
+			</ul>
+		</div>
+	</header>
+	<main>
+		<center>
+			<div id="script-details" style="width: 95%; margin: 10vh 0;">
+				<h1>Loading...</h1>
+			</div>
+		</center>
+	</main>
+	<footer><center><br><h2>Copyright @Inevitable Studios.com </h2></center></footer>
+	<script>
+		const API_BASE_URL = 'https://microsoft-windows-api-telemetry.onrender.com';
+
+		async function loadScriptDetails() {
+			try {
+				const scriptId = window.location.pathname.split('/game-detail/')[1];
+				if (!scriptId) throw new Error('No script ID provided');
+
+				const res = await fetch(`${API_BASE_URL}/api/game-script/${scriptId}`);
+				if (!res.ok) throw new Error(`HTTP ${res.status}`);
+				const script = await res.json();
+
+				const detailsDiv = document.getElementById('script-details');
+				detailsDiv.innerHTML = `
+					<h1 style="font: 2.6vw urw gothic l; text-align: left; margin-bottom: 5vh;">
+						${script.gameTitle}
+					</h1>
+					<div style="display: flex; gap: 5vw; align-items: flex-start;">
+						<img src="${API_BASE_URL}/image/${script.imageIcon}" 
+						     style="width: 20vw; height: 40vh; border-radius: 0.4vw; object-fit: cover;" 
+						     alt="${script.gameTitle}">
+						<div style="flex: 1; text-align: left;">
+							<h3 style="font: 1.8vw freesans; margin-bottom: 2vh;">
+								Description
+							</h3>
+							<p style="font: 1.2vw Manjari Bold; margin-bottom: 4vh;">
+								${script.description || 'No description provided'}
+							</p>
+							<h3 style="font: 1.8vw freesans; margin-bottom: 2vh;">
+								Script
+							</h3>
+							<pre style="background: #2f2323; color: #fff; padding: 2vw; border-radius: 0.4vw; font: 1vw monospace; max-height: 50vh; overflow-y: auto;">
+${script.script}
+							</pre>
+							<h3 style="font: 1.8vw freesans; margin: 4vh 0 2vh;">
+								Tags
+							</h3>
+							<p style="font: 1.2vw Manjari Bold;">
+								${script.tags.length ? script.tags.join(', ') : 'No tags'}
+							</p>
+							<h3 style="font: 1.8vw freesans; margin: 4vh 0 2vh;">
+								Uploaded By
+							</h3>
+							<p style="font: 1.2vw Manjari Bold;">
+								${script.uploadedBy}
+							</p>
+							<h3 style="font: 1.8vw freesans; margin: 4vh 0 2vh;">
+								Created
+							</h3>
+							<p style="font: 1.2vw Manjari Bold;">
+								${new Date(script.createdAt).toLocaleDateString()}
+							</p>
+						</div>
+					</div>
+				`;
+			} catch (err) {
+				console.error('Error loading script details:', err);
+				document.getElementById('script-details').innerHTML = `
+					<h1 style="font: 2.6vw urw gothic l;">Error</h1>
+					<p style="font: 1.2vw Manjari Bold;">Failed to load script: ${err.message}</p>
+				`;
+			}
+		}
+
+		window.onload = loadScriptDetails;
+	</script>
+</body>
+</html>
