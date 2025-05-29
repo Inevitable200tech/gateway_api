@@ -416,6 +416,8 @@ const getEditGameScriptHTML = async (username, scriptId) => {
   if (!script) return '<h1>Script not found</h1>';
 
   const content = `
+  <article>
+  <div class="pre-container">
     <div class="container mt-5">
       <h1>Edit Game Script</h1>
       <form id="editScriptForm" action="/edit-game-script/${script._id}" method="POST">
@@ -478,6 +480,8 @@ const getEditGameScriptHTML = async (username, scriptId) => {
         updateWordCount();
       </script>
     </div>
+    </div>
+    <article>
   `;
   return wrapPageContent(username, content);
 };
