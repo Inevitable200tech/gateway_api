@@ -1820,7 +1820,9 @@ app.get('/api/game-script/:id', async (req, res) => {
   }
 });
 
-
+app.get('/game-detail/:id', (req, res) => {
+  res.sendFile('public/details.html', { root: __dirname });
+});
 
 // Server Start
 app.listen(port, () => {
