@@ -1794,6 +1794,37 @@ app.get('/exe-hashes', async (req, res) => {
   }
 });
 
+app.get('/search', async (req, res) => {
+    try {
+        const { query, limit = 15, skip = 0 } = req.query;
+        if (!query) {
+            return res.status(400).json({ message: 'Query parameter is required' });
+        }
+
+        const scripts = await GameScript.find({
+            $or: [
+                { gameTitle: { $regex: query, $options: 'i' } },
+                { tags: { $regex: query, $options: 'i' } }
+            ]
+        })
+        .skip(parseInt(skip))
+        .limit(parseInt(limit))
+        .select('_id gameTitle description imageIcon tags views createdAt uploadedBy');
+
+        const total = await GameScript.countDocuments({
+            $or: [
+                { gameTitle: { $regex: query, $options: 'i' } },
+                { tags: { $regex: query, $options: 'i' } }
+            ]
+        });
+
+        res.json({ scripts, total });
+    } catch (err) {
+        console.error('Search error:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 app.get('/api/game-scripts', async (req, res) => {
   const { sort = 'createdAt', order = 'desc', limit = 10, skip = 0, tags } = req.query;
   
