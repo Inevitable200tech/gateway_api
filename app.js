@@ -531,31 +531,76 @@ const getAddGameScriptHTML = (username) => wrapPageContent(username, `
   <article>
   <div class="pre-container">
     <div class="container mt-5">
-    <h1 class="mb-4">Add New Game Script</h1>
-    <form action="/add-game-script" method="POST" enctype="multipart/form-data">
-      <div class="form-group">
-        <label for="gameTitle">Game Title</label>
-        <input type="text" class="form-control" id="gameTitle" name="gameTitle" required>
-      </div>
-      <div class="form-group">
-        <label for="imageIcon">Image Icon</label>
-        <input type="file" class="form-control-file" id="imageIcon" name="imageIcon" accept="image/*" required>
-      </div>
-      <div class="form-group">
-        <label for="script">Script (Lua)</label>
-        <textarea class="form-control" id="script" name="script" rows="10" required></textarea>
-      </div>
-      <div class="form-group">
-        <label for="tags">Tags (comma-separated)</label>
-        <input type="text" class="form-control" id="tags" name="tags">
-      </div>
-      <div class="form-group">
-        <label for="description">Description</label>
-        <textarea class="form-control" id="description" name="description" rows="4"></textarea>
-      </div>
-      <button type="submit" class="btn btn-primary">Add Script</button>
-      <a href="/dashboard" class="btn btn-secondary">Cancel</a>
-    </form>
+      <h1 class="mb-4">Add New Game Script</h1>
+      <form id="addScriptForm" action="/add-game-script" method="POST" enctype="multipart/form-data">
+        <div class="mb-3">
+          <label for="gameTitle" class="form-label">Game Title</label>
+          <input type="text" class="form-control" id="gameTitle" name="gameTitle" required>
+        </div>
+        <div class="mb-3">
+          <label for="imageIcon" class="form-label">Image Icon</label>
+          <input type="file" class="form-control-file" id="imageIcon" name="imageIcon" accept="image/*" required>
+        </div>
+        <div class="mb-3">
+          <label for="script" class="form-label">Script (Lua)</label>
+          <textarea class="form-control" id="script" name="script" rows="10" required></textarea>
+        </div>
+        <div class="mb-3">
+          <label for="tags" class="form-label">Tags (comma-separated)</label>
+          <input type="text" class="form-control" id="tags" name="tags">
+        </div>
+        <div class="mb-3">
+          <label for="description" class="form-label">Description (max 2 words)</label>
+          <textarea class="form-control" id="description" name="description" rows="4"></textarea>
+          <small id="wordCount" class="form-text text-muted">0/2 words</small>
+          <div id="descriptionError" class="text-danger" style="display:none;">Description must be 2 words or fewer.</div>
+        </div>
+        <button type="submit" class="btn btn-primary">Add Script</button>
+        <a href="/dashboard" class="btn btn-secondary">Cancel</a>
+      </form>
+      <script>
+        const descriptionTextarea = document.getElementById('description');
+        const wordCountSpan = document.getElementById('wordCount');
+        const descriptionError = document.getElementById('descriptionError');
+        const wordLimit = 2;
+
+        function updateWordCount() {
+          const text = descriptionTextarea.value.trim();
+          const words = text ? text.split(/\\s+/).filter(word => word.length > 0) : [];
+          const wordCount = words.length;
+          wordCountSpan.textContent = \`\${wordCount}/\${wordLimit} words\`;
+          if (wordCount > wordLimit) {
+            wordCountSpan.classList.add('text-danger');
+            descriptionError.style.display = 'block';
+          } else {
+            wordCountSpan.classList.remove('text-danger');
+            descriptionError.style.display = 'none';
+          }
+        }
+
+        descriptionTextarea.addEventListener('input', function() {
+          let text = this.value.trim();
+          const words = text ? text.split(/\\s+/).filter(word => word.length > 0) : [];
+          if (words.length > wordLimit) {
+            this.value = words.slice(0, wordLimit).join(' ') + ' ';
+          }
+          updateWordCount();
+        });
+
+        document.getElementById('addScriptForm').addEventListener('submit', function(e) {
+          const text = descriptionTextarea.value.trim();
+          const words = text ? text.split(/\\s+/).filter(word => word.length > 0) : [];
+          if (words.length > wordLimit) {
+            e.preventDefault();
+            descriptionError.style.display = 'block';
+          } else {
+            descriptionError.style.display = 'none';
+          }
+        });
+
+        // Initial word count update
+        updateWordCount();
+      </script>
     </div>
   </div>
   </article>
