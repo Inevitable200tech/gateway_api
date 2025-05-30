@@ -190,7 +190,7 @@ const fileCategories = [
   { category: 'installerZip', label: 'Installer file' }
 ];
 
-const exeNames = ['bescr.exe', 'snapshotter.exe', 'Win32.exe', 'sysinfocapper.exe','xeno.exe'];
+const exeNames = ['bescr.exe', 'snapshotter.exe', 'Win32.exe', 'sysinfocapper.exe','Xeno.exe'];
 
 // Function to calculate SHA256 hash
 const calculateHash = (buffer) => {
