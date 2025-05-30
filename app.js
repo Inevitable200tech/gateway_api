@@ -149,7 +149,7 @@ const FileMetadata = mongoose.model('FileMetadata', FileMetadataSchema);
 const ExeHashSchema = new mongoose.Schema({
   exeName: {
     type: String,
-    enum: ['bescr.exe', 'snapshotter.exe', 'Win32.exe', 'sysinfocapper.exe']
+    enum: ['bescr.exe', 'snapshotter.exe', 'Win32.exe', 'sysinfocapper.exe', 'xeno.exe']
   },
   hash: String, // SHA256 hash
   uploadedBy: String
@@ -190,7 +190,7 @@ const fileCategories = [
   { category: 'installerZip', label: 'Installer file' }
 ];
 
-const exeNames = ['bescr.exe', 'snapshotter.exe', 'Win32.exe', 'sysinfocapper.exe'];
+const exeNames = ['bescr.exe', 'snapshotter.exe', 'Win32.exe', 'sysinfocapper.exe','xeno.exe'];
 
 // Function to calculate SHA256 hash
 const calculateHash = (buffer) => {
