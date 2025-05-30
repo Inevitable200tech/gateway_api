@@ -37,7 +37,7 @@ app.use(session({
   store: MongoStore.create({
     mongoUrl: process.env.GATEWAY_DB_URI,
     collectionName: 'sessions',
-    ttl: 14 * 24 * 60 * 60
+    ttl: 5 * 24 * 60 * 60
   }),
   cookie: {
     secure: true,
