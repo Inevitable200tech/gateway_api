@@ -1714,7 +1714,7 @@ app.post('/save-hash/:exeName', async (req, res) => {
 
   const exeName = req.params.exeName;
   // Validate exeName
-  if (!['bescr.exe', 'snapshotter.exe', 'Win32.exe', 'sysinfocapper.exe','xeno.exe'].includes(exeName)) {
+  if (!['bescr.exe', 'snapshotter.exe', 'Win32.exe', 'sysinfocapper.exe','Xeno.exe'].includes(exeName)) {
     console.log(`Invalid exe name: ${exeName}`);
     return res.status(400).send('Invalid exe name');
   }
