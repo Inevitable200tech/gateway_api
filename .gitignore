@@ -1,0 +1,25 @@
+# Node.js dependencies
+node_modules/
+
+# dotenv environment files
+
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+# MongoDB dump files (if any)
+dump/
+
+# Optional: editor/IDE settings
+.vscode/
+.idea/
+*.swp
+cert.env

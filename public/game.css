@@ -1,0 +1,21 @@
+.pre-container {
+    background: #000;
+    width: 90%;
+    display: flex;
+    justify-self: center;
+    border-radius: 1vw;
+}
+.pre-container textarea,.pre-container input{
+    background:#000;
+    color: #fff;
+}
+.pre-container label,.pre-container h1{
+    color:#fff;
+}
+.container{
+    width:90vw;
+}
+article{
+    display: flex;
+    justify-content: center;
+}

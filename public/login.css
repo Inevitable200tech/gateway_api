@@ -1,0 +1,80 @@
+@font-face {
+    font-family: 'URW Gothic';
+    src: url('/fonts/URWGothic-Book.ttf') format('truetype'); /* Updated with correct font path */
+}
+
+@font-face {
+    font-family: 'Manjari Bold';
+    src: url('/fonts/Manjari-Bold.ttf') format('truetype'); /* Updated with correct font path */
+}
+
+@font-face {
+    font-family: 'Manjari Regular';
+    src: url('/fonts/Manjari-Regular.ttf') format('truetype'); /* Optional: load regular variant */
+}
+
+
+body{
+	margin:0;
+	background-color:#78828a;
+	padding:0;
+}
+.login{
+	display: flex;
+	flex-direction: column;
+	align-content: center;
+	justify-content: center;
+  width: 45vw;
+  margin: 18vh;
+	height: 55vh;
+	background: #fff;
+	border-radius:3%;
+	align-self: center;
+}
+.login input{
+	background:#c02929b5;
+	height: 8vh;
+	font:1.5vw URW Gothic;
+	color: white;
+	width: 40vw;
+}
+.login input::placeholder{
+	color: #fff;
+}
+.login h2{
+	font:2.5vw Manjari Bold;
+	text-align: center;
+	margin-top: 0vh;
+}
+.login form{
+	display: flex;
+	flex-direction: column;
+	gap: 2vh;
+	align-self: center;
+}
+input.btn{
+	width: 20%;
+	height: 20%;
+	border-radius:1vw;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

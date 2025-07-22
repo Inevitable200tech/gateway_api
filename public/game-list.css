@@ -1,0 +1,24 @@
+.pre-container-list{
+  display: flex;
+  justify-self: center;
+  padding:3vw;
+  background: #000;
+  height: auto;
+  min-height: 70vh;
+}
+.pre-container-list th,.pre-container-list{
+    color:#fff;
+}
+.container{
+    width:90vw;
+}
+.table{
+    height: 30vh;
+}
+.table th,.table td{
+    color:#fff;
+}
+article{
+    display: flex;
+    justify-content: center;
+}

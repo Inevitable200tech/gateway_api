@@ -1,0 +1,31 @@
+{
+  "name": "api_gateway",
+  "version": "1.0.0",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "description": "",
+  "dependencies": {
+    "axios": "^1.9.0",
+    "bcrypt": "^5.1.1",
+    "connect-mongo": "^5.1.0",
+    "cookie": "^1.0.2",
+    "cors": "^2.8.5",
+    "csrf": "^3.1.0",
+    "csrf-sync": "^4.2.1",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "express-rate-limit": "^7.5.0",
+    "express-session": "^1.18.1",
+    "mongodb": "^6.16.0",
+    "mongoose": "^8.13.2",
+    "multer": "^1.4.5-lts.2",
+    "node-cron": "^3.0.3",
+    "node-fetch": "^3.3.2"
+  }
+}
